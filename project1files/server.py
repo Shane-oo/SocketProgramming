@@ -114,19 +114,18 @@ def client_handler(key,mask,connection, address):
               # start next turn
               sock.send(tiles.MessagePlayerTurn(idnum).pack())
 
-sel = selectors.DefaultSelector()
+
 # create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+#config the socket in non-blocking mode
+sock.setblocking(0) 
 # listen on all network interfaces
 server_address = ('', 30020)
 sock.bind(server_address)
-
 print('listening on {}'.format(sock.getsockname()))
 
 sock.listen(5)
-#config the socket in non-blocking mode
-sock.setblocking(False) 
+
 #registers the socket to be monitired with sel.select() for the events
 sel.register(sock,selectors.EVENT_READ,data = None)
 
