@@ -19,8 +19,6 @@ import socket
 import sys
 import tiles
 
-import selectors 
-import types
 
 def client_handler(connection, address):
   host, port = address
@@ -102,47 +100,20 @@ def client_handler(connection, address):
             # start next turn
             connection.send(tiles.MessagePlayerTurn(idnum).pack())
 
-sel = selectors.DefaultSelector()
+
 # create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#config the socket in non-blocking mode
-sock.setblocking(0) 
+
 # listen on all network interfaces
 server_address = ('', 30020)
 sock.bind(server_address)
+
 print('listening on {}'.format(sock.getsockname()))
 
 sock.listen(5)
 
-#registers the socket to be monitired with sel.select() for the events
-sel.register(sock,selectors.EVENT_READ,data = None)
-
-
-def accept_wrapper(sock):
-  global connection, client_address 
-  connection,client_address = sock.accept()
-  print('received connection from {}'.format(client_address))
-  connection.setblocking(False)
-  data = types.SimpleNamespace(address =client_address, inb = b'', outb = b'')
-  events = selectors.EVENT_READ | selectors.EVENT_WRITE
-  sel.register(connection, events,data = data)
-
-#Event Loop
 while True:
-  #blocks until there are sockets ready for I/O
-  #returns a list of (key,events) tuples for each socket
-  events = sel.select(timeout=None)
-  for key, mask in events:
-    if key.data is None:
-      #key.fileobj is the socket object
-      accept_wrapper(key.fileobj)
-    else:
-      
-      #mask is an event mask of the operations that are ready
-      #service_connection(key,mask)
-      client_handler(connection,client_address)
   # handle each new connection independently
-  #connection, client_address = sock.accept()
-  #print('received connection from {}'.format(client_address))
-
-  #client_handler(connection, client_address)
+  connection, client_address = sock.accept()
+  print('received connection from {}'.format(client_address))
+  client_handler(connection, client_address)
