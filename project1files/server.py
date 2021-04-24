@@ -32,15 +32,15 @@ def client_handler(key,mask,connection, address):
   idnum = 0
   live_idnums = [idnum]
 
-  connection.send(tiles.MessageWelcome(idnum).pack())
-  connection.send(tiles.MessagePlayerJoined(name, idnum).pack())
-  connection.send(tiles.MessageGameStart().pack())
+  sock.send(tiles.MessageWelcome(idnum).pack())
+  sock.send(tiles.MessagePlayerJoined(name, idnum).pack())
+  sock.send(tiles.MessageGameStart().pack())
 
   for _ in range(tiles.HAND_SIZE):
     tileid = tiles.get_random_tileid()
-    connection.send(tiles.MessageAddTileToHand(tileid).pack())
+    sock.send(tiles.MessageAddTileToHand(tileid).pack())
   
-  connection.send(tiles.MessagePlayerTurn(idnum).pack())
+  sock.send(tiles.MessagePlayerTurn(idnum).pack())
   
   board = tiles.Board()
 
@@ -71,24 +71,24 @@ def client_handler(key,mask,connection, address):
         if isinstance(msg, tiles.MessagePlaceTile):
           if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
             # notify client that placement was successful
-            connection.send(msg.pack())
+            sock.send(msg.pack())
 
             # check for token movement
             positionupdates, eliminated = board.do_player_movement(live_idnums)
 
             for msg in positionupdates:
-              connection.send(msg.pack())
+              sock.send(msg.pack())
           
             if idnum in eliminated:
-              connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+              sock.send(tiles.MessagePlayerEliminated(idnum).pack())
               return
 
             # pickup a new tile
             tileid = tiles.get_random_tileid()
-            connection.send(tiles.MessageAddTileToHand(tileid).pack())
+            sock.send(tiles.MessageAddTileToHand(tileid).pack())
 
             # start next turn
-            connection.send(tiles.MessagePlayerTurn(idnum).pack())
+            sock.send(tiles.MessagePlayerTurn(idnum).pack())
 
         # sent by the player in the second turn, to choose their token's
         # starting path
@@ -99,14 +99,14 @@ def client_handler(key,mask,connection, address):
               positionupdates, eliminated = board.do_player_movement(live_idnums)
 
               for msg in positionupdates:
-                connection.send(msg.pack())
+                sock.send(msg.pack())
             
               if idnum in eliminated:
-                connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+                sock.send(tiles.MessagePlayerEliminated(idnum).pack())
                 return
             
               # start next turn
-              connection.send(tiles.MessagePlayerTurn(idnum).pack())
+              sock.send(tiles.MessagePlayerTurn(idnum).pack())
 
 sel = selectors.DefaultSelector()
 # create a TCP/IP socket
