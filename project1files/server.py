@@ -39,7 +39,7 @@ def client_handler(key,mask,connection, address):
   for _ in range(tiles.HAND_SIZE):
     tileid = tiles.get_random_tileid()
     sock.send(tiles.MessageAddTileToHand(tileid).pack())
-  
+    
   sock.send(tiles.MessagePlayerTurn(idnum).pack())
   
   board = tiles.Board()
@@ -47,8 +47,14 @@ def client_handler(key,mask,connection, address):
   buffer = bytearray()
 
   while True:
+    if mask & selectors.EVENT_WRITE:
+      print('echoing', repr(data.outb), 'to', data.address)
+      sock.send(tiles.MessagePlayerTurn(idnum).pack())
+      
+      
     if mask & selectors.EVENT_READ:
       chunk = sock.recv(4096)
+      print("YYOOY")
       if not chunk:
         print('client {} disconnected'.format(address))
         sel.unregister(sock)
@@ -133,6 +139,7 @@ def accept_wrapper(sock):
   data = types.SimpleNamespace(address =client_address, inb = b'', outb = b'')
   events = selectors.EVENT_READ | selectors.EVENT_WRITE
   sel.register(connection, events,data = data)
+
 #Event Loop
 while True:
   #blocks until there are sockets ready for I/O
@@ -143,9 +150,10 @@ while True:
       #key.fileobj is the socket object
       accept_wrapper(key.fileobj)
     else:
+      print("hi")
       #mask is an event mask of the operations that are ready
       #service_connection(key,mask)
-      client_handler(key, mask,connection,client_address)
+      #client_handler(key, mask,connection,client_address)
   # handle each new connection independently
   #connection, client_address = sock.accept()
   #print('received connection from {}'.format(client_address))
