@@ -22,9 +22,12 @@ import tiles
 import selectors 
 import types
 
-def client_handler(connection, address):
+def client_handler(key,mask,connection, address):
   host, port = address
   name = '{}:{}'.format(host, port)
+
+  sock = key.fileobj
+  data = key.data
 
   idnum = 0
   live_idnums = [idnum]
@@ -44,63 +47,66 @@ def client_handler(connection, address):
   buffer = bytearray()
 
   while True:
-    chunk = connection.recv(4096)
-    if not chunk:
-      print('client {} disconnected'.format(address))
-      return
+    if mask & selectors.EVENT_READ:
+      chunk = sock.recv(4096)
+      if not chunk:
+        print('client {} disconnected'.format(address))
+        sel.unregister(sock)
+        sock.close()
+        return
 
-    buffer.extend(chunk)
+      buffer.extend(chunk)
 
-    while True:
-      msg, consumed = tiles.read_message_from_bytearray(buffer)
-      if not consumed:
-        break
+      while True:
+        msg, consumed = tiles.read_message_from_bytearray(buffer)
+        if not consumed:
+          break
 
-      buffer = buffer[consumed:]
+        buffer = buffer[consumed:]
 
-      print('received message {}'.format(msg))
+        print('received message {}'.format(msg))
 
-      # sent by the player to put a tile onto the board (in all turns except
-      # their second)
-      if isinstance(msg, tiles.MessagePlaceTile):
-        if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
-          # notify client that placement was successful
-          connection.send(msg.pack())
-
-          # check for token movement
-          positionupdates, eliminated = board.do_player_movement(live_idnums)
-
-          for msg in positionupdates:
+        # sent by the player to put a tile onto the board (in all turns except
+        # their second)
+        if isinstance(msg, tiles.MessagePlaceTile):
+          if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
+            # notify client that placement was successful
             connection.send(msg.pack())
-          
-          if idnum in eliminated:
-            connection.send(tiles.MessagePlayerEliminated(idnum).pack())
-            return
 
-          # pickup a new tile
-          tileid = tiles.get_random_tileid()
-          connection.send(tiles.MessageAddTileToHand(tileid).pack())
-
-          # start next turn
-          connection.send(tiles.MessagePlayerTurn(idnum).pack())
-
-      # sent by the player in the second turn, to choose their token's
-      # starting path
-      elif isinstance(msg, tiles.MessageMoveToken):
-        if not board.have_player_position(msg.idnum):
-          if board.set_player_start_position(msg.idnum, msg.x, msg.y, msg.position):
             # check for token movement
             positionupdates, eliminated = board.do_player_movement(live_idnums)
 
             for msg in positionupdates:
               connection.send(msg.pack())
-            
+          
             if idnum in eliminated:
               connection.send(tiles.MessagePlayerEliminated(idnum).pack())
               return
-            
+
+            # pickup a new tile
+            tileid = tiles.get_random_tileid()
+            connection.send(tiles.MessageAddTileToHand(tileid).pack())
+
             # start next turn
             connection.send(tiles.MessagePlayerTurn(idnum).pack())
+
+        # sent by the player in the second turn, to choose their token's
+        # starting path
+        elif isinstance(msg, tiles.MessageMoveToken):
+          if not board.have_player_position(msg.idnum):
+            if board.set_player_start_position(msg.idnum, msg.x, msg.y, msg.position):
+              # check for token movement
+              positionupdates, eliminated = board.do_player_movement(live_idnums)
+
+              for msg in positionupdates:
+                connection.send(msg.pack())
+            
+              if idnum in eliminated:
+                connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+                return
+            
+              # start next turn
+              connection.send(tiles.MessagePlayerTurn(idnum).pack())
 
 sel = selectors.DefaultSelector()
 # create a TCP/IP socket
@@ -139,7 +145,7 @@ while True:
     else:
       #mask is an event mask of the operations that are ready
       #service_connection(key,mask)
-      client_handler(connection, client_address)
+      client_handler(key, mask,connection,client_address)
   # handle each new connection independently
   #connection, client_address = sock.accept()
   #print('received connection from {}'.format(client_address))
