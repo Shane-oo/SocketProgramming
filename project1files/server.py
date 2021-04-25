@@ -33,10 +33,10 @@ all_connections = []
 all_addresses = []
 
 
-def client_handler(connection, address):
-  host, port = address
+def client_handler():
+  #host, port = address
   name = '{}:{}'.format(host, port)
-
+  connection = all_connections[0]
   idnum = 0
   live_idnums = [idnum]
 
@@ -130,14 +130,14 @@ def client_handler(connection, address):
 
 
 
-# Create a Socket ( connect two computers)
+# Create a Socket 
 def create_socket():
     try:
         global host
         global port
         global s
         host = ""
-        port = 9999
+        port = 30020
         s = socket.socket()
 
     except socket.error as msg:
@@ -172,14 +172,17 @@ def accepting_connections():
 
     while True:
         try:
-            conn, address = s.accept()
-            s.setblocking(1)  # prevents timeout
+            if (len(all_connections)<tiles.PLAYER_LIMIT):
+                conn, address = s.accept()
+                s.setblocking(1)  # prevents timeout
+            
+                all_connections.append(conn)
+                all_addresses.append(address)
 
-            all_connections.append(conn)
-            all_addresses.append(address)
-
-            print("Connection has been established :" + address[0])
-
+                print("Connection has been established :" + address[0])
+            else:
+                print("MAX CONNECTIONS REACHED")
+                break
         except:
             print("Error accepting connections")
 
@@ -194,17 +197,18 @@ def accepting_connections():
 # 192.168.0.112> dir
 
 
-def start_turtle():
-
+def start_commands():
+   
     while True:
-        cmd = input('turtle> ')
+        cmd = input('Input> ')
         if cmd == 'list':
             list_connections()
         elif 'select' in cmd:
             conn = get_target(cmd)
             if conn is not None:
                 send_target_commands(conn)
-
+        elif 'start' in cmd:
+            client_handler()
         else:
             print("Command not recognized")
 
@@ -237,7 +241,7 @@ def get_target(cmd):
         print("You are now connected to :" + str(all_addresses[target][0]))
         print(str(all_addresses[target][0]) + ">", end="")
         return conn
-        # 192.168.0.4> dir
+        
 
     except:
         print("Selection not valid")
@@ -272,12 +276,15 @@ def create_workers():
 def work():
     while True:
         x = queue.get()
+ 
         if x == 1:
             create_socket()
             bind_socket()
             accepting_connections()
         if x == 2:
-            start_turtle()
+            print("-"*80+"\n" + "-"*15+"ENTER 'start' TO COMMENCE GAME AT ANY TIME"+"-"*20 +"\n"+"-"*80)
+            start_commands()
+            
 
         queue.task_done()
 
