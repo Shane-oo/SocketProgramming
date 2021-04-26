@@ -22,6 +22,8 @@ import tiles
 import threading
 import time
 from queue import Queue
+from random import randrange
+import random
 
 #Two things being done simultaneously
 NUMBER_OF_THREADS = 2
@@ -31,87 +33,92 @@ JOB_NUMBER =[1,2]
 queue = Queue()
 all_connections = []
 all_addresses = []
+in_game_connections = []
+
+
 
 
 def client_handler():
   #host, port = address
   name = '{}:{}'.format(host, port)
-  connection = all_connections[0]
+  #connection = all_connections[0]
   idnum = 0
   live_idnums = [idnum]
+  for i, conn in enumerate(in_game_connections):
+    connection = in_game_connections[i]
+    print("AHHHH",type(connection))
+    connection.send(tiles.MessageWelcome(idnum).pack())
+    connection.send(tiles.MessagePlayerJoined(name, idnum).pack())
+    connection.send(tiles.MessageGameStart().pack())
 
-  connection.send(tiles.MessageWelcome(idnum).pack())
-  connection.send(tiles.MessagePlayerJoined(name, idnum).pack())
-  connection.send(tiles.MessageGameStart().pack())
-
-  for _ in range(tiles.HAND_SIZE):
-    tileid = tiles.get_random_tileid()
-    connection.send(tiles.MessageAddTileToHand(tileid).pack())
+    for _ in range(tiles.HAND_SIZE):
+        tileid = tiles.get_random_tileid()
+        connection.send(tiles.MessageAddTileToHand(tileid).pack())
   
-  connection.send(tiles.MessagePlayerTurn(idnum).pack())
+    connection.send(tiles.MessagePlayerTurn(idnum).pack())
   
   board = tiles.Board()
 
   buffer = bytearray()
 
-  while True:
-    chunk = connection.recv(4096)
-    if not chunk:
-      print('client {} disconnected'.format(address))
-      return
+  #while True:
+   # chunk = connection.recv(4096)
+    #if not chunk:
+     # print('client {} disconnected'.format(address))
+      #return
 
-    buffer.extend(chunk)
+    #buffer.extend(chunk)
 
-    while True:
-      msg, consumed = tiles.read_message_from_bytearray(buffer)
-      if not consumed:
-        break
+    #while True:
+     # msg, consumed = tiles.read_message_from_bytearray(buffer)
+      #if not consumed:
+       # break
 
-      buffer = buffer[consumed:]
+      #buffer = buffer[consumed:]
 
-      print('received message {}'.format(msg))
+      #print('received message {}'.format(msg))
 
       # sent by the player to put a tile onto the board (in all turns except
       # their second)
-      if isinstance(msg, tiles.MessagePlaceTile):
-        if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
+      #if isinstance(msg, tiles.MessagePlaceTile):
+       # if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
           # notify client that placement was successful
-          connection.send(msg.pack())
+        #  connection.send(msg.pack())
 
           # check for token movement
-          positionupdates, eliminated = board.do_player_movement(live_idnums)
+         # positionupdates, eliminated = board.do_player_movement(live_idnums)
 
-          for msg in positionupdates:
-            connection.send(msg.pack())
+          #for msg in positionupdates:
+           # connection.send(msg.pack())
           
-          if idnum in eliminated:
-            connection.send(tiles.MessagePlayerEliminated(idnum).pack())
-            return
+          #if idnum in eliminated:
+           # connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+            #return
 
           # pickup a new tile
-          tileid = tiles.get_random_tileid()
-          connection.send(tiles.MessageAddTileToHand(tileid).pack())
+          #tileid = tiles.get_random_tileid()
+          #connection.send(tiles.MessageAddTileToHand(tileid).pack())
 
           # start next turn
-          connection.send(tiles.MessagePlayerTurn(idnum).pack())
+          #connection.send(tiles.MessagePlayerTurn(idnum).pack())
 
       # sent by the player in the second turn, to choose their token's
       # starting path
-      elif isinstance(msg, tiles.MessageMoveToken):
-        if not board.have_player_position(msg.idnum):
-          if board.set_player_start_position(msg.idnum, msg.x, msg.y, msg.position):
+      #elif isinstance(msg, tiles.MessageMoveToken):
+       # if not board.have_player_position(msg.idnum):
+        #  if board.set_player_start_position(msg.idnum, msg.x, msg.y, msg.position):
             # check for token movement
-            positionupdates, eliminated = board.do_player_movement(live_idnums)
+         #   positionupdates, eliminated = board.do_player_movement(live_idnums)
 
-            for msg in positionupdates:
-              connection.send(msg.pack())
+          #  for msg in positionupdates:
+           #   connection.send(msg.pack())
             
-            if idnum in eliminated:
-              connection.send(tiles.MessagePlayerEliminated(idnum).pack())
-              return
+           # if idnum in eliminated:
+            #  connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+             # return
             
             # start next turn
-            connection.send(tiles.MessagePlayerTurn(idnum).pack())
+            #connection.send(tiles.MessagePlayerTurn(idnum).pack())
 
 
 
@@ -187,50 +194,38 @@ def accepting_connections():
             print("Error accepting connections")
 
 
-# 2nd thread functions - 1) See all the clients 2) Select a client 3) Send commands to the connected client
-# Interactive prompt for sending commands
-# turtle> list
-# 0 Friend-A Port
-# 1 Friend-B Port
-# 2 Friend-C Port
-# turtle> select 1
-# 192.168.0.112> dir
+# assign random turn order
+def order_players():
+
+    return 0
 
 
 def start_commands():
    
     while True:
         cmd = input('Input> ')
-        if cmd == 'list':
-            list_connections()
+        if cmd == 'start':
+            assign_order()
+            client_handler()
         elif 'select' in cmd:
             conn = get_target(cmd)
             if conn is not None:
-                send_target_commands(conn)
-        elif 'start' in cmd:
-            client_handler()
+                #send_target_commands(conn)
+                client_handler(conn)
         else:
             print("Command not recognized")
 
 
 # Display all current active connections with client
-
-def list_connections():
-    results = ''
+# assign a random turn order to connected clients number_connections
+def assign_order():
+ 
+    randomList = random.sample(range(len(all_connections)), len(all_connections))
 
     for i, conn in enumerate(all_connections):
-        try:
-            conn.send(str.encode(' '))
-            conn.recv(20480)
-        except:
-            del all_connections[i]
-            del all_addresses[i]
-            continue
 
-        results = str(i) + "   " + str(all_addresses[i][0]) + "   " + str(all_addresses[i][1]) + "\n"
-
-    print("----Clients----" + "\n" + results)
-
+        in_game_connections.append(all_connections[randomList[i]])
+    print(in_game_connections)
 
 # Selecting the target
 def get_target(cmd):
