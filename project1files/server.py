@@ -35,7 +35,7 @@ all_connections = []
 all_addresses = []
 in_game_connections = []
 listOfNames = []
-
+buffer = None
 #intialise the game for all clients and notify all clients of new joining client
 def welcome_all_players():
     #intialise the game for all clients
@@ -54,76 +54,85 @@ def welcome_all_players():
         for _ in range(tiles.HAND_SIZE):
             tileid = tiles.get_random_tileid()
             in_game_connections[i].send(tiles.MessageAddTileToHand(tileid).pack())
+
+#notify all clients of whats been played
+def send_to_all(func):
+    for i, conn in enumerate(in_game_connections):
+        in_game_connections[i].send(func)
+
     
-def play_turn(connection):
-    while True:
-        print("stuck1")
+def play_turn(connection,idnum,live_idnums):
+    
+        print("LIVE ID_NUMS=",live_idnums)
         chunk = connection.recv(4096)
         if not chunk:
-            print('client {} disconnected'.format(address))
+            #print('client {} disconnected'.format(address))
             return
+        global buffer
+        buffer.extend(chunk)
 
-    buffer.extend(chunk)
-
-        while True:
-            print("stuck2")
-            msg, consumed = tiles.read_message_from_bytearray(buffer)
+        
+        msg, consumed = tiles.read_message_from_bytearray(buffer)
         if not consumed:
-            break
+            return
 
         buffer = buffer[consumed:]
 
         print('received message {}'.format(msg))
 
-      # sent by the player to put a tile onto the board (in all turns except
-      # their second)
-      if isinstance(msg, tiles.MessagePlaceTile):
-        if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
-          # notify client that placement was successful
-          connection.send(msg.pack())
+        # sent by the player to put a tile onto the board (in all turns except
+        # their second)
+        if isinstance(msg, tiles.MessagePlaceTile):
+            if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
+                #notify client that placement was successful
+                #connection.send(msg.pack())
+                #send to all
+                send_to_all(msg.pack())
 
-          # check for token movement
-          positionupdates, eliminated = board.do_player_movement(live_idnums)
+                # check for token movement
+                positionupdates, eliminated = board.do_player_movement(live_idnums)
 
-          for msg in positionupdates:
-            connection.send(msg.pack())
+                for msg in positionupdates:
+                    #connection.send(msg.pack())
+                    send_to_all(msg.pack(),idnum)
           
-          if idnum in eliminated:
-            connection.send(tiles.MessagePlayerEliminated(idnum).pack())
-            return
+                if idnum in eliminated:
+                    #connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+                    send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
+                    return
 
-          # pickup a new tile
-          tileid = tiles.get_random_tileid()
-          connection.send(tiles.MessageAddTileToHand(tileid).pack())
+                # pickup a new tile
+                tileid = tiles.get_random_tileid()
+                connection.send(tiles.MessageAddTileToHand(tileid).pack())
 
-          # start next turn
-          connection.send(tiles.MessagePlayerTurn(idnum).pack())
 
-      # sent by the player in the second turn, to choose their token's
-      # starting path
-      elif isinstance(msg, tiles.MessageMoveToken):
-        if not board.have_player_position(msg.idnum):
-          if board.set_player_start_position(msg.idnum, msg.x, msg.y, msg.position):
-            # check for token movement
-            positionupdates, eliminated = board.do_player_movement(live_idnums)
+                # sent by the player in the second turn, to choose their token's
+                # starting path
+            elif isinstance(msg, tiles.MessageMoveToken):
+                if not board.have_player_position(msg.idnum):
+                    if board.set_player_start_position(msg.idnum, msg.x, msg.y, msg.position):
+                        # check for token movement
+                        positionupdates, eliminated = board.do_player_movement(live_idnums)
 
-            for msg in positionupdates:
-              connection.send(msg.pack())
+                        for msg in positionupdates:
+                            #connection.send(msg.pack())
+                            send_to_all(msg.pack())
             
-            if idnum in eliminated:
-              connection.send(tiles.MessagePlayerEliminated(idnum).pack())
-              return
-            
-            # start next turn
-            connection.send(tiles.MessagePlayerTurn(idnum).pack())
+                        if idnum in eliminated:
+                            #connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+                            send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
+                            return
+                            
+                            
 
 def client_handler():
     #live_idnums = [idnum]
     #assign name to raddr host and port name
     global listOfNames
+    live_idnums = []
     for i, conn in enumerate(in_game_connections):
         idnum = i
-        live_idnums = [idnum]
+        live_idnums.append(i)
         #assign name to raddr host and port name
         listOfNames.append('{}:{}'.format(in_game_connections[idnum].getpeername()[0],in_game_connections[idnum].getpeername()[1]))
     #Notify clients of game starting    
@@ -133,16 +142,20 @@ def client_handler():
     welcome_all_players()
     
 
+
     global board 
     board = tiles.Board()
     global buffer
     buffer = bytearray()
     gameOver = False
+    count = 0
     while (gameOver != True):
+        in_game_connections[i].send((tiles.MessagePlayerTurn(idnum).pack()))
         for i, conn in enumerate(in_game_connections):
-            play_turn(in_game_connections[i])
-
-        gameOver = True
+            play_turn(in_game_connections[i],i,live_idnums)
+        count +=1
+        if(count>10):
+            gameOver = True
    #while True:
     #    chunk = connection.recv(4096)
      #   if not chunk:
