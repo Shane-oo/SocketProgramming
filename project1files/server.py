@@ -251,14 +251,14 @@ def accepting_connections():
             print("Error accepting connections")
 
 
-
-
 def start_commands():
     while True:
         cmd = input('Input> ')
         if cmd == 'start':
             assign_order()
             client_handler()
+        #elif not needed  
+        # #from youtube  
         elif 'select' in cmd:
             conn = get_target(cmd)
             if conn is not None:
@@ -278,7 +278,8 @@ def assign_order():
     
     
 
-# Selecting the target
+# Selecting the target 
+#from youtube
 def get_target(cmd):
     try:
         target = cmd.replace('select ', '')  # target = id
@@ -295,6 +296,7 @@ def get_target(cmd):
 
 
 # Send commands to client/victim or a friend
+#from youtube
 def send_target_commands(conn):
     while True:
         try:
