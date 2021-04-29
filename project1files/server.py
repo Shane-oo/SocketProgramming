@@ -73,6 +73,22 @@ def send_to_all(func):
     for players in in_game_clients:
         players.connection.send(func)
 
+def check_elimination(idnum,connection,live_idnums):
+    global board
+    global buffer
+    eliminated = board.do_player_movement(live_idnums)[1]
+    if idnum in eliminated:
+                # Let client know they have been eliminated
+                connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+                # remove player from in_game_clients and liveidnums 
+                elimate_player(idnum,live_idnums)
+                # Let all clients know of elimated player
+                send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
+                return True
+    else:
+        return False
+
+# Remove the player from the live game variables
 def elimate_player(eliminatedIdnum,live_idnums):
     live_idnums.remove(eliminatedIdnum)
     for player in in_game_clients:
@@ -89,7 +105,7 @@ def play_turn(connection,idnum,live_idnums):
         print('client {} disconnected'.format(connection))
         # remove player from in_game_clients and liveidnums 
         elimate_player(idnum,live_idnums)
-        # Let all clients know of elimated player
+        # Let all clients know of disconnected player
         send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
         return
 
@@ -110,19 +126,14 @@ def play_turn(connection,idnum,live_idnums):
             send_to_all(msg.pack())
 
             # check for token movement
-            positionupdates, eliminated = board.do_player_movement(live_idnums)
+            positionupdates = board.do_player_movement(live_idnums)[0]
 
             for msg in positionupdates:
                 # connection.send(msg.pack())
                 send_to_all(msg.pack())
-          
-            if idnum in eliminated:
-                # Let client know they have been eliminated
-                connection.send(tiles.MessagePlayerEliminated(idnum).pack())
-                # remove player from in_game_clients and liveidnums 
-                elimate_player(idnum,live_idnums)
-                # Let all clients know of elimated player
-                send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
+            # check to see if players token has been eliminated
+            if (check_elimination(idnum, connection,live_idnums)):
+                #player has been eliminated
                 return
 
             # pickup a new tile
@@ -134,19 +145,14 @@ def play_turn(connection,idnum,live_idnums):
         if not board.have_player_position(msg.idnum):
             if board.set_player_start_position(msg.idnum, msg.x, msg.y, msg.position):
                 # check for token movement
-                positionupdates, eliminated = board.do_player_movement(live_idnums)
+                positionupdates = board.do_player_movement(live_idnums) [0]
 
                 for msg in positionupdates:
                     #connection.send(msg.pack())
                     send_to_all(msg.pack())
-            
-                if idnum in eliminated:
-                    # Let client know they have been eliminated
-                    connection.send(tiles.MessagePlayerEliminated(idnum).pack())
-                    # remove player from in_game_clients and liveidnums 
-                    elimate_player(idnum,live_idnums)
-                    # Let all clients know of elimated player
-                    send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
+                # check to see if players token has been eliminated
+                if (check_elimination(idnum, connection,live_idnums)):
+                    #player has been eliminated
                     return
                 
 
@@ -156,6 +162,11 @@ def client_handler():
     #intialise live_idnums with all in_game_clients ids
     for players in in_game_clients:
         live_idnums.append(players.idnum)
+    #check to see if multiplayer or single player game
+    if(len(live_idnums)>1):
+        muliplayer = True
+    else:
+        muliplayer = False
     # Add the four players into the game and give them their starting hand    
     welcome_all_players()
     # must use globals
@@ -171,24 +182,18 @@ def client_handler():
         #check for eliminated players
         for players in in_game_clients:
             # Check to see if player was eliminated by another player
-            if(players.idnum not in live_idnums):
-                print("PLAYER ELIMINATED ANOTHER PLAYER")
-                # Let client know they have been eliminated
-                connection.send(tiles.MessagePlayerEliminated(players.idnum).pack())
-                # remove player from in_game_clients and liveidnums 
-                elimate_player(players.idnum,live_idnums)
-                # Let all clients know of elimated player
-                send_to_all((tiles.MessagePlayerEliminated(players.idnum).pack()))
+            if (check_elimination(players.idnum, players.connection,live_idnums)):
+                #player has been eliminated
+                print("Player was eliminated by another player")
+                continue
             # Let clients know that a new turn has started
             send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
             play_turn(players.connection,players.idnum,live_idnums)
         # all players have been elimated therefore game is over
-        if(len(live_idnums)==0):
+        if(len(live_idnums)==0 or (muliplayer == True and len(live_idnums)==1)):
             print("GAME OVER")
             gameOver = True
  
-
-
 
 # Create a Socket 
 def create_socket():
@@ -222,7 +227,6 @@ def bind_socket():
 
 # Handling connection from multiple clients and saving to a list
 # Closing previous connections when server.py file is restarted
-
 def accepting_connections():
     for c in all_connections:
         c.close()
