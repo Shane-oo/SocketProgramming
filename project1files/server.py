@@ -35,7 +35,7 @@ queue = Queue()
 all_connections = []
 all_addresses = []
 in_game_clients = []
-spectator_client = []
+spectator_clients = []
 buffer = None
 board = None
 
@@ -50,6 +50,7 @@ class Player:
 # this cool countdown function was taken from 
 # https://www.geeksforgeeks.org/how-to-create-a-countdown-timer-using-python/
 def countdown(t):
+    
     while t:
         mins, secs = divmod(t, 60)
         timer = '{:02d}:{:02d}'.format(mins, secs)
@@ -58,12 +59,47 @@ def countdown(t):
         t -= 1
     print('New Game Starting')
 
+#def check_for_leave():
+ #   print("CHECK FOR LEAVE1")
+  #  for player in all_connections:
+   #     data  = player.connection.recv(4096)
+    #    print("CHECK FOR LEAVE2")
+     #   try:
+      #      data  = player.connection.recv(4096)
+       #     print("CHECK FOR LEAVE3")
+        #    #data  = player.connection.recv(4096)
+         #   if(player.connection.send(data)==0):
+          #     print("CHECK FOR LEAVE4")
+           # 
+        #except socket.error:
+         #   print("CHECK FOR LEAVE5")
+          #  print("socket.error")
+          #  all_connections.remove(player)
+           # player.connection.close()
+            #print("CHECK FOR LEAVE6")
+   # print("CHECK FOR LEAVE7")
+    #if( len(all_connections)==0):
+     #   print("CHECK FOR LEAVE8")
+      #  print("returning false")
+       # return False
+   # else: 
+    #    print("CHECK FOR LEAVE9")
+     #   return True
+
+
 #intialise the game for all clients and notify all clients of new joining client
 def welcome_all_players():
     #intialise the game for all clients
     for players in in_game_clients:
         #Notify client of their id
-        players.connection.send(tiles.MessageWelcome(players.idnum).pack())
+
+        #hmmmm to this try. (last double check of disconnected player before a new game)
+        try:
+            players.connection.send(tiles.MessageWelcome(players.idnum).pack())
+        except:
+            ("player has disconnected", players.name)
+            in_game_clients.remove(players)
+            all_connections.remove(players)
         #Notify client that a new game is starting
         players.connection.send(tiles.MessageGameStart().pack())
         # Notify all already joined clients of new player name and idnum
@@ -76,10 +112,35 @@ def welcome_all_players():
             tileid = tiles.get_random_tileid()
             players.connection.send(tiles.MessageAddTileToHand(tileid).pack())
 
+def welcome_spectators():
+    for players in spectator_clients:
+        #Notify client of their id
+        print("SPECTATOR id = ",players.idnum)
+        players.connection.send(tiles.MessageWelcome(players.idnum).pack())
+        #Notify client that a new game is starting
+        players.connection.send(tiles.MessageGameStart().pack())
+        # Notify spectator of playing clients
+        for otherPlayers in in_game_clients:
+                players.connection.send(tiles.MessagePlayerJoined(otherPlayers.name, otherPlayers.idnum).pack())
+
 #notify all clients of whats been played
 def send_to_all(func):
     for players in in_game_clients:
-        players.connection.send(func)
+        try:
+            players.connection.send(func)
+        except:
+            ("player has disconnected", players.name)
+            in_game_clients.remove(players)
+            all_connections.remove(players)
+    for spectators in spectator_clients:
+        #check to see if spectator is still in game
+        try:
+            spectators.connection.send(func)
+        except socket.error:
+            print("spectator has disconneted ", spectators.name)
+            spectator_clients.remove(spectators)
+            all_connections.remove(spectators)
+
 
 def check_elimination(idnum,connection,live_idnums):
     global board
@@ -111,6 +172,11 @@ def play_turn(connection,idnum,live_idnums):
     chunk = connection.recv(4096)
     if not chunk:
         print('client {} disconnected'.format(connection))
+        connection.close()
+        #remove player from connections 
+        for player in all_connections:
+            if player.connection == connection:
+                all_connections.remove(player)
         # remove player from in_game_clients and liveidnums 
         elimate_player(idnum,live_idnums)
         # Let all clients know of disconnected player
@@ -177,6 +243,8 @@ def client_handler():
         muliplayer = False
     # Add the four players into the game and give them their starting hand    
     welcome_all_players()
+
+    welcome_spectators()
     # must use globals
     global board 
     board = tiles.Board()
@@ -205,7 +273,12 @@ def client_handler():
     if(len(all_connections)>0):
          # start countdown for new game
         countdown(10)
+        # check to see if clients leave during countdown
+        #if(check_for_leave()==True):
         assign_order()
+        #else:
+         #   print("All players left during countdown \n No more connected clients")
+        #return
     else:
         print("No more connected clients")
         return
@@ -288,9 +361,10 @@ def assign_order():
     print(all_connections)
     if(len(all_connections)==0):
         print("All clients disconnected")
-        return
-    #Clear in_game_clients for a new round
+        return -1
+    #Clear in_game_clients and spectators for a new round
     in_game_clients.clear()
+    spectator_clients.clear()
     randomList = random.sample(range(len(all_connections)), len(all_connections))
     i = 0
     while(i<tiles.PLAYER_LIMIT and i<len(all_connections)):
@@ -299,7 +373,7 @@ def assign_order():
         i+=1
     for player in all_connections:
         if player not in in_game_clients:
-            spectator_client.append(player)
+            spectator_clients.append(player)
             print("spectator =" ,player.idnum)
 
     client_handler()
