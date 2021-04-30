@@ -35,7 +35,7 @@ queue = Queue()
 all_connections = []
 all_addresses = []
 in_game_clients = []
-
+spectator_client = []
 buffer = None
 board = None
 
@@ -236,17 +236,14 @@ def accepting_connections():
 
     while True:
         try:
-            if (len(all_connections)<tiles.PLAYER_LIMIT):
-                conn, address = s.accept()
-                s.setblocking(1)  # prevents timeout
+            
+            conn, address = s.accept()
+            s.setblocking(1)  # prevents timeout
 
-                all_connections.append(Player(conn, len(all_connections)))
-                all_addresses.append(address)
+            all_connections.append(Player(conn, len(all_connections)))
+            all_addresses.append(address)
 
-                print("Connection has been established :" + address[0])
-            else:
-                print("MAX CONNECTIONS REACHED")
-                break
+            print("Connection has been established :" + address[0])
         except:
             print("Error accepting connections")
 
@@ -268,13 +265,21 @@ def start_commands():
             print("Command not recognized")
 
 
-# Display all current active connections with client
+# Select only four connected clients to play a game
 # assign a random turn order to connected clients number_connections
 def assign_order():
     randomList = random.sample(range(len(all_connections)), len(all_connections))
-    # 
-    for i, conn in enumerate(all_connections):
+    i = 0
+    while(i<tiles.PLAYER_LIMIT and i<len(all_connections)):
         in_game_clients.append(all_connections[randomList[i]])
+        print("Selected player =",in_game_clients[i].idnum)
+        i+=1
+    for player in all_connections:
+        if player not in in_game_clients:
+            spectator_client.append(player)
+            print("spectator =" ,player.idnum)
+    
+
     
     
 
