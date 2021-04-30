@@ -47,8 +47,16 @@ class Player:
         self.idnum = idnum
         # Assign name to their raddr host and port name
         self.name = '{}:{}'.format(connection.getpeername()[0],connection.getpeername()[1])
-
-
+# this cool countdown function was taken from 
+# https://www.geeksforgeeks.org/how-to-create-a-countdown-timer-using-python/
+def countdown(t):
+    while t:
+        mins, secs = divmod(t, 60)
+        timer = '{:02d}:{:02d}'.format(mins, secs)
+        print("New game commences in",timer, end="\r")
+        time.sleep(1)
+        t -= 1
+    print('New Game Starting')
 
 #intialise the game for all clients and notify all clients of new joining client
 def welcome_all_players():
@@ -193,6 +201,14 @@ def client_handler():
         if(len(live_idnums)==0 or (muliplayer == True and len(live_idnums)==1)):
             print("GAME OVER")
             gameOver = True
+    
+    if(len(all_connections)>0):
+         # start countdown for new game
+        countdown(10)
+        assign_order()
+    else:
+        print("No more connected clients")
+        return
  
 
 # Create a Socket 
@@ -253,7 +269,7 @@ def start_commands():
         cmd = input('Input> ')
         if cmd == 'start':
             assign_order()
-            client_handler()
+            #client_handler()
         #elif not needed  
         # #from youtube  
         elif 'select' in cmd:
@@ -268,6 +284,13 @@ def start_commands():
 # Select only four connected clients to play a game
 # assign a random turn order to connected clients number_connections
 def assign_order():
+    # check to see if clients are still connected
+    print(all_connections)
+    if(len(all_connections)==0):
+        print("All clients disconnected")
+        return
+    #Clear in_game_clients for a new round
+    in_game_clients.clear()
     randomList = random.sample(range(len(all_connections)), len(all_connections))
     i = 0
     while(i<tiles.PLAYER_LIMIT and i<len(all_connections)):
@@ -278,6 +301,8 @@ def assign_order():
         if player not in in_game_clients:
             spectator_client.append(player)
             print("spectator =" ,player.idnum)
+
+    client_handler()
     
 
     
@@ -299,22 +324,6 @@ def get_target(cmd):
         print("Selection not valid")
         return None
 
-
-# Send commands to client/victim or a friend
-#from youtube
-def send_target_commands(conn):
-    while True:
-        try:
-            cmd = input()
-            if cmd == 'quit':
-                break
-            if len(str.encode(cmd)) > 0:
-                conn.send(str.encode(cmd))
-                client_response = str(conn.recv(20480), "utf-8")
-                print(client_response, end="")
-        except:
-            print("Error sending commands")
-            break
 
 
 # Create worker threads
