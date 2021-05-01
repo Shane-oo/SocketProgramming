@@ -129,36 +129,39 @@ def send_to_all_connected(func):
     for players in all_connections:
         players.connection.send(func)
 
-def check_elimination(idnum,connection,live_idnums):
+def check_elimination(idnum,connection):
     global board
     global buffer
+    global live_idnums
     eliminated = board.do_player_movement(live_idnums)[1]
     if idnum in eliminated:
                 # Let client know they have been eliminated
                 connection.send(tiles.MessagePlayerEliminated(idnum).pack())
                 # remove player from in_game_clients and liveidnums 
-                elimate_player(idnum,live_idnums)
+                elimate_player(idnum)
                 # Let all clients know of elimated player
                 send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
                 return True
     else:
         return False
 
-def check_all_eliminations(live_idnums):
+def check_all_eliminations():
     print("checking eliminations")
-    global board
-    global buffer
+    global live_idnums
     for idnums in live_idnums:
         for players in in_game_clients:
             if idnums == players.idnum:
-                check_elimination(players.idnum, players.connection, live_idnums)
-
+                check_elimination(players.idnum, players.connection)
 
 
 # Remove the player from the live game variables
-def elimate_player(eliminatedIdnum,live_idnums):
+def elimate_player(eliminatedIdnum):
+    global live_idnums
     global in_game_clients
-    print("remove live idnum:",live_idnums.remove(eliminatedIdnum)
+    #print("remove live idnum:",live_idnums.remove(eliminatedIdnum))
+    print("live_id before removal",live_idnums)
+    live_idnums = [aliveIds for aliveIds in live_idnums if aliveIds != eliminatedIdnum]
+    print("live_ids after removal",live_idnums)
     for player in in_game_clients:
         if(player.idnum == eliminatedIdnum):
             print("befor elim",in_game_clients)
@@ -166,7 +169,9 @@ def elimate_player(eliminatedIdnum,live_idnums):
             print("Player " ,player.name," with id " ,player.idnum," has been eliminated")
             print("after",in_game_clients)
 
-def play_turn(connection,idnum,live_idnums):
+            
+def play_turn(connection,idnum):
+    global live_idnums
     global board
     global buffer
     connection.send(tiles.MessagePlayerTurn(idnum).pack())
@@ -179,7 +184,7 @@ def play_turn(connection,idnum,live_idnums):
             if player.connection == connection:
                 all_connections.remove(player)
         # remove player from in_game_clients and liveidnums 
-        elimate_player(idnum,live_idnums)
+        elimate_player(idnum)
         # Let all clients know of disconnected player
         send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
         return
@@ -207,7 +212,7 @@ def play_turn(connection,idnum,live_idnums):
                 # connection.send(msg.pack())
                 send_to_all(msg.pack())
             # check to see if players token has been eliminated
-            if (check_elimination(idnum, connection,live_idnums)):
+            if (check_elimination(idnum, connection)):
                 #player has been eliminated
                 return
 
@@ -226,13 +231,14 @@ def play_turn(connection,idnum,live_idnums):
                     #connection.send(msg.pack())
                     send_to_all(msg.pack())
                 # check to see if players token has been eliminated
-                if (check_elimination(idnum, connection,live_idnums)):
+                if (check_elimination(idnum, connection)):
                     #player has been eliminated
                     return
                 
 
 
 def client_handler():
+    global live_idnums
     live_idnums = []
     #intialise live_idnums with all in_game_clients ids
     for players in in_game_clients:
@@ -255,24 +261,33 @@ def client_handler():
 
     gameOver = False
     count = 0
-    while (gameOver != True):
+    while (gameOver != True ):
         #check for eliminated players
+        print("CHECKIN ALL ELIMINATIONS1")
+        check_all_eliminations()
         print(live_idnums)
-        for players in in_game_clients:
-            # Check to see if player was eliminated by another player
-            if (check_elimination(players.idnum, players.connection,live_idnums)):
-                #player has been eliminated
-                print("Player was eliminated by another player")
-                continue
-            # Let clients know that a new turn has started
-            send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
-            play_turn(players.connection,players.idnum,live_idnums)
-        # all players have been elimated therefore game is over
-        check_all_eliminations(live_idnums)
-        if(len(live_idnums)==0 or (muliplayer == True and len(live_idnums)==1)):
+        if(len(live_idnums)>0):
+            for players in in_game_clients:
+                # Check to see if player was eliminated by another player
+                if (check_elimination(players.idnum, players.connection)):
+                    #player has been eliminated
+                    print("Player was eliminated by another player")
+                    continue
+                # Let clients know that a new turn has started
+                send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
+                play_turn(players.connection,players.idnum)
+                print("CHECKIN ALL ELIMINATIONS2")
+                check_all_eliminations()
+                # all players have been elimated therefore game is over
+                if(len(live_idnums)==0 or (muliplayer == True and len(live_idnums)==1)):
+                    print("GAME OVER")
+                    gameOver = True
+                    break
+        else:
             print("GAME OVER")
             gameOver = True
-    
+            break
+    print("OUT OF LOOP")
     if(len(all_connections)>0):
          # start countdown for new game
         send_to_all_connected(tiles.MessageCountdown().pack())
