@@ -59,32 +59,6 @@ def countdown(t):
         t -= 1
     print('New Game Starting')
 
-#def check_for_leave():
- #   print("CHECK FOR LEAVE1")
-  #  for player in all_connections:
-   #     data  = player.connection.recv(4096)
-    #    print("CHECK FOR LEAVE2")
-     #   try:
-      #      data  = player.connection.recv(4096)
-       #     print("CHECK FOR LEAVE3")
-        #    #data  = player.connection.recv(4096)
-         #   if(player.connection.send(data)==0):
-          #     print("CHECK FOR LEAVE4")
-           # 
-        #except socket.error:
-         #   print("CHECK FOR LEAVE5")
-          #  print("socket.error")
-          #  all_connections.remove(player)
-           # player.connection.close()
-            #print("CHECK FOR LEAVE6")
-   # print("CHECK FOR LEAVE7")
-    #if( len(all_connections)==0):
-     #   print("CHECK FOR LEAVE8")
-      #  print("returning false")
-       # return False
-   # else: 
-    #    print("CHECK FOR LEAVE9")
-     #   return True
 
 
 #intialise the game for all clients and notify all clients of new joining client
@@ -93,13 +67,16 @@ def welcome_all_players():
     for players in in_game_clients:
         #Notify client of their id
 
-        #hmmmm to this try. (last double check of disconnected player before a new game)
-        try:
-            players.connection.send(tiles.MessageWelcome(players.idnum).pack())
-        except:
-            ("player has disconnected", players.name)
-            in_game_clients.remove(players)
-            all_connections.remove(players)
+        #ATTEMPT AT TIER3
+        # commented out connection issues attempt- will continue in tier3
+        #try:
+        players.connection.send(tiles.MessageWelcome(players.idnum).pack())
+        #except:
+         #   ("player has disconnected", players.name)
+            #in_game_clients.remove(players)
+            #in_game_clients = [player for player in in_game_clients if player != players ]
+          #  in_game_clients[:] = [connectedPlayers for connectedPlayers in in_game_clients if not players]
+          #  all_connections.remove(players)
         #Notify client that a new game is starting
         players.connection.send(tiles.MessageGameStart().pack())
         # Notify all already joined clients of new player name and idnum
@@ -125,22 +102,32 @@ def welcome_spectators():
 
 #notify all clients of whats been played
 def send_to_all(func):
+    global in_game_clients
+    global spectator_clients
+    
     for players in in_game_clients:
         try:
             players.connection.send(func)
         except:
+            #ATTEMPT AT TIER3 FOR WHEN A PLAYER LEAVES
             ("player has disconnected", players.name)
-            in_game_clients.remove(players)
+            in_game_clients = [connectedPlayers for connectedPlayers in in_game_clients if connectedPlayers != players]
             all_connections.remove(players)
     for spectators in spectator_clients:
         #check to see if spectator is still in game
         try:
             spectators.connection.send(func)
         except socket.error:
+            #ATTEMPT AT TIER3 FOR WHEN SPECTATOR LEAVES
             print("spectator has disconneted ", spectators.name)
             spectator_clients.remove(spectators)
+            spectator_clients = [connectedSpecs for connectedSpecs in spectator_clients if connectedSpecs != spectators]
             all_connections.remove(spectators)
 
+#function to send to all of connected clients that may be in game or out of game
+def send_to_all_connected(func):
+    for players in all_connections:
+        players.connection.send(func)
 
 def check_elimination(idnum,connection,live_idnums):
     global board
@@ -157,13 +144,27 @@ def check_elimination(idnum,connection,live_idnums):
     else:
         return False
 
+def check_all_eliminations(live_idnums):
+    print("checking eliminations")
+    global board
+    global buffer
+    for idnums in live_idnums:
+        for players in in_game_clients:
+            if idnums == players.idnum:
+                check_elimination(players.idnum, players.connection, live_idnums)
+
+
+
 # Remove the player from the live game variables
 def elimate_player(eliminatedIdnum,live_idnums):
-    live_idnums.remove(eliminatedIdnum)
+    global in_game_clients
+    print("remove live idnum:",live_idnums.remove(eliminatedIdnum)
     for player in in_game_clients:
         if(player.idnum == eliminatedIdnum):
-            in_game_clients.remove(player)
+            print("befor elim",in_game_clients)
+            in_game_clients = [connectedPlayers for connectedPlayers in in_game_clients if connectedPlayers != player]
             print("Player " ,player.name," with id " ,player.idnum," has been eliminated")
+            print("after",in_game_clients)
 
 def play_turn(connection,idnum,live_idnums):
     global board
@@ -256,6 +257,7 @@ def client_handler():
     count = 0
     while (gameOver != True):
         #check for eliminated players
+        print(live_idnums)
         for players in in_game_clients:
             # Check to see if player was eliminated by another player
             if (check_elimination(players.idnum, players.connection,live_idnums)):
@@ -266,19 +268,16 @@ def client_handler():
             send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
             play_turn(players.connection,players.idnum,live_idnums)
         # all players have been elimated therefore game is over
+        check_all_eliminations(live_idnums)
         if(len(live_idnums)==0 or (muliplayer == True and len(live_idnums)==1)):
             print("GAME OVER")
             gameOver = True
     
     if(len(all_connections)>0):
          # start countdown for new game
+        send_to_all_connected(tiles.MessageCountdown().pack())
         countdown(10)
-        # check to see if clients leave during countdown
-        #if(check_for_leave()==True):
         assign_order()
-        #else:
-         #   print("All players left during countdown \n No more connected clients")
-        #return
     else:
         print("No more connected clients")
         return
@@ -325,7 +324,6 @@ def accepting_connections():
 
     while True:
         try:
-            
             conn, address = s.accept()
             s.setblocking(1)  # prevents timeout
 
