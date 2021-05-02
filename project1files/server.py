@@ -26,10 +26,10 @@ from queue import Queue
 import random
 
 #Two things being done simultaneously
-NUMBER_OF_THREADS = 2
+NUMBER_OF_THREADS = 3
 #Job no1 = listen for connection and accept
 #job no2 = send commands and handle connections with clients
-JOB_NUMBER =[1,2]
+JOB_NUMBER =[1,2,3]
 queue = Queue()
 all_connections = []
 all_addresses = []
@@ -361,6 +361,7 @@ def start_commands():
                 client_handler(conn)
         else:
             print("Command not recognized")
+            
 
 
 # Select only four connected clients to play a game
@@ -368,6 +369,7 @@ def start_commands():
 def assign_order():
     # check to see if clients are still connected
     print(all_connections)
+    #i dont like this, when did i write this lol?
     if(len(all_connections)==0):
         print("All clients disconnected")
         return -1
@@ -423,14 +425,26 @@ def work():
         x = queue.get()
  
         if x == 1:
+            print('cint')
             create_socket()
             bind_socket()
             accepting_connections()
         if x == 2:
             print("-"*80+"\n" + "-"*15+"ENTER 'start' TO COMMENCE GAME AT ANY TIME"+"-"*20 +"\n"+"-"*80)
             start_commands()
-            
 
+        if x == 3:
+            #check_for_disconnetions()
+            #constantly checking for disconnections?
+            # simple wait for a connection to test
+            #time.sleep(10)
+            #while(all_connections!=None):
+              #  print()
+              #  chunk = all_connections[0].connection.recv(4096)
+               # if not chunk:
+               #     print("disconnected")
+               # if chunk:
+                    print("got something back connection is alive")
         queue.task_done()
 
 
