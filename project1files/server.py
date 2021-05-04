@@ -25,11 +25,14 @@ import time
 from queue import Queue
 import random
 
+
+import select
+
 #Two things being done simultaneously
-NUMBER_OF_THREADS = 3
+NUMBER_OF_THREADS = 2
 #Job no1 = listen for connection and accept
 #job no2 = send commands and handle connections with clients
-JOB_NUMBER =[1,2,3]
+JOB_NUMBER =[1,2]
 queue = Queue()
 all_connections = []
 all_addresses = []
@@ -70,6 +73,7 @@ def welcome_all_players():
         #ATTEMPT AT TIER3
         # commented out connection issues attempt- will continue in tier3
         #try:
+        print(connection_alive(players.connection))
         players.connection.send(tiles.MessageWelcome(players.idnum).pack())
         #except:
          #   ("player has disconnected", players.name)
@@ -260,15 +264,15 @@ def client_handler():
     gameOver = False
     count = 0
     while (gameOver != True ):
+        print("LIVE_IDNUMS=",live_idnums)
         #check for eliminated players
-        print("CHECKIN ALL ELIMINATIONS1")
         check_all_eliminations()
         if(len(live_idnums)>0):
             for players in in_game_clients:
                 # Check to see if player was eliminated by another player
                 if (check_elimination(players.idnum, players.connection)):
                     #player has been eliminated
-                    print("Player was eliminated by another player")
+                    print("Player was eliminated by another player do not play turn")
                     continue
                 # Let clients know that a new turn has started
                 send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
@@ -276,11 +280,13 @@ def client_handler():
                 check_all_eliminations()
                 # all players have been elimated therefore game is over
                 if(len(live_idnums)==0 or (multiplayer == True and len(live_idnums)==1)):
-                    print("GAME OVER")
+                    print("GAME OVER PLAYER",live_idnums,"IS THE WINNER")
                     gameOver = True
                     break
+        #its multiplayer and theres been a tie for winner at end of game
         else:
-            print("GAME OVER")
+            #live_idnums would equal to 0 when in multiplayer mode when there is a tie
+            print("GAME OVER ALL CLIENTS ELIMINATED (TIE FOR WINNER)")
             gameOver = True
             break
     print("OUT OF LOOP")
@@ -342,8 +348,10 @@ def accepting_connections():
             all_addresses.append(address)
 
             print("Connection has been established :" + address[0])
+           
         except:
             print("Error accepting connections")
+    
 
 
 def start_commands():
@@ -418,7 +426,11 @@ def create_workers():
         t.daemon = True
         t.start()
 
+def connection_alive(conn):
+    print("connection_alive")
+    pollerObject = select.poll()
 
+    pollerObject.register(conn, select.POLLIN)
 # Do next job that is in the queue (handle connections, send commands)
 def work():
     while True:
@@ -433,18 +445,6 @@ def work():
             print("-"*80+"\n" + "-"*15+"ENTER 'start' TO COMMENCE GAME AT ANY TIME"+"-"*20 +"\n"+"-"*80)
             start_commands()
 
-        if x == 3:
-            #check_for_disconnetions()
-            #constantly checking for disconnections?
-            # simple wait for a connection to test
-            #time.sleep(10)
-            #while(all_connections!=None):
-              #  print()
-              #  chunk = all_connections[0].connection.recv(4096)
-               # if not chunk:
-               #     print("disconnected")
-               # if chunk:
-                    print("got something back connection is alive")
         queue.task_done()
 
 
