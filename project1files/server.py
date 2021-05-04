@@ -162,13 +162,14 @@ def elimate_player(eliminatedIdnum):
     print("live_id before removal",live_idnums)
     live_idnums = [aliveIds for aliveIds in live_idnums if aliveIds != eliminatedIdnum]
     print("live_ids after removal",live_idnums)
+    # Let all clients know of elimated player
+    #send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
     for player in in_game_clients:
         if(player.idnum == eliminatedIdnum):
             print("befor elim",in_game_clients)
             in_game_clients = [connectedPlayers for connectedPlayers in in_game_clients if connectedPlayers != player]
             print("Player " ,player.name," with id " ,player.idnum," has been eliminated")
             print("after",in_game_clients)
-    # Let all clients know of elimated player
     send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
             
 def play_turn(connection,idnum):
@@ -263,8 +264,8 @@ def client_handler():
                     continue
                 # Let clients know that a new turn has started
                 send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
-                if(players.idnum in live_idnums):
-                    play_turn(players.connection,players.idnum)
+                #if(players.idnum in live_idnums):
+                play_turn(players.connection,players.idnum)
                 check_all_eliminations()
                 # all players have been elimated therefore game is over
                 if(len(live_idnums)==0 or (multiplayer == True and len(live_idnums)==1)):
@@ -281,7 +282,9 @@ def client_handler():
     if(len(all_connections)>0):
          # start countdown for new game
          #could add a check for disconnected here
+        print("befroe send to all connected")
         send_to_all_connected(tiles.MessageCountdown().pack())
+        print("after send all to connecres")
         countdown(10)
         assign_order()
     else:
@@ -312,19 +315,21 @@ def is_socket_closed(connection):
     try:
         # this will try to read bytes without blocking and also without removing them from buffer (peek only)
         data = connection.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
-        if len(data) == 0:
+        if not data:
             client_disconnected = True
         else:
             client_disconnected = False
     except BlockingIOError:
-        return  # socket is open and reading from it would block
+        client_disconnected = False  # socket is open and reading from it would block
     except ConnectionResetError:
         client_disconnected = True  # socket was closed for some other reason
-    except Exception as e:
+    except  socket.error:
+        client_disconnected = True
+   # except Exception as e:
         #logger.exception("unexpected exception when checking if a socket is closed")
-        client_disconnected = False
+      # client_disconnected = False
     #if connected client_disconnected would be false here
-    if(client_disconnected ==True):
+    if(client_disconnected == True):
         #run complete disconnection from server
         complete_disconnection(connection)
     print("before is_cocket_closed return client_disconneted=",client_disconnected)
