@@ -330,8 +330,12 @@ def complete_disconnection(badConnection):
     
     #remove them from in_game_clients if they are a in game player
     for clients in in_game_clients:
+      
         if clients.connection == badConnection:
             elimate_player(clients.idnum)
+            send_to_all(tiles.MessagePlayerLeft(clients.idnum).pack())
+
+
     #remove them from spectator_clients if they are a spectator 
     spectator_clients = [connectedSpectators for connectedSpectators in spectator_clients if connectedSpectators.connection != badConnection]
 
