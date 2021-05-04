@@ -29,7 +29,7 @@ import random
 import select
 
 #Two things being done simultaneously
-NUMBER_OF_THREADS = 2
+NUMBER_OF_THREADS = 3
 #Job no1 = listen for connection and accept
 #job no2 = send commands and handle connections with clients
 JOB_NUMBER =[1,2]
@@ -41,6 +41,7 @@ spectator_clients = []
 buffer = None
 board = None
 
+gameOver = None
 
 
 class Player:
@@ -99,6 +100,31 @@ def welcome_spectators():
         # Notify spectator of playing clients
         for otherPlayers in in_game_clients:
                 players.connection.send(tiles.MessagePlayerJoined(otherPlayers.name, otherPlayers.idnum).pack())
+
+
+def new_spectator(joinedInGameSpect):
+    global board
+    global buffer
+    if(is_socket_closed(joinedInGameSpect.connection)==True):
+            #do not welcome spectator
+            return
+    #let new client catch up to the game state
+    #Notify client of their id
+    joinedInGameSpect.connection.send(tiles.MessageWelcome(joinedInGameSpect.idnum).pack())
+     # Notify spectator of playing clients
+    for otherPlayers in in_game_clients:
+        joinedInGameSpect.connection.send(tiles.MessagePlayerJoined(otherPlayers.name, otherPlayers.idnum).pack())
+        joinedInGameSpect.connection.send(tiles.MessagePlayerTurn(otherPlayers.idnum).pack())
+        #joinedInGameSpect.connection.send(tiles.MessagePlayerEliminated(otherPlayers.idnum).pack())
+   #attempt at teir4
+    #msg, consumed = tiles.read_message_from_bytearray(buffer)
+   # if not consumed:
+      # print("CUNT ISNT CONSUMED")
+       # return
+    #buffer = buffer[consumed:]
+    #joinedInGameSpect.connection.send(msg.unpack(buffer))
+    #print("FUCK YOU2")
+   
 
 #notify all clients of whats been played
 def send_to_all(func):
@@ -229,7 +255,9 @@ def play_turn(connection,idnum):
 
 
 def client_handler():
+    global gameOver
     global live_idnums
+
     live_idnums = []
     #intialise live_idnums with all in_game_clients ids
     for players in in_game_clients:
@@ -380,9 +408,11 @@ def accepting_connections():
             s.setblocking(1)  # prevents timeout
             all_connections.append(Player(conn, len(all_connections)))
             all_addresses.append(address)
-
-            print("Connection has been established :" + address[0])
            
+            print("Connection has been established :" + address[0])
+            if(gameOver==False):
+                print("client joined while game in progress")
+                queue.put(3)
         except:
             print("Error accepting connections")
     
@@ -438,6 +468,7 @@ def create_workers():
 
 # Do next job that is in the queue (handle connections, send commands)
 def work():
+
     while True:
         x = queue.get()
  
@@ -445,9 +476,20 @@ def work():
             create_socket()
             bind_socket()
             accepting_connections()
+             #in the middle of the game become a spectator
+            
         if x == 2:
-            print("-"*80+"\n" + "-"*15+"ENTER 'start' TO COMMENCE GAME AT ANY TIME"+"-"*20 +"\n"+"-"*80)
-            start_commands()
+            #print("-"*80+"\n" + "-"*15+"ENTER 'start' TO COMMENCE GAME AT ANY TIME"+"-"*20 +"\n"+"-"*80)
+            #wait for players to join then start game
+            countdown(8)
+            #start_commands()
+            assign_order()
+            queue.put(2)
+        if x==3:
+            joinedInGameSpect = all_connections[-1]
+            spectator_clients.append(joinedInGameSpect )
+            new_spectator(joinedInGameSpect)
+           
 
         queue.task_done()
 
