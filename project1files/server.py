@@ -68,25 +68,19 @@ def countdown(t):
 def welcome_all_players():
     #intialise the game for all clients
     for players in in_game_clients:
-        #Notify client of their id
-
-        #ATTEMPT AT TIER3
-        # commented out connection issues attempt- will continue in tier3
-        #try:
-        print(connection_alive(players.connection))
+        if(is_socket_closed(players.connection)==True):
+            #do not welcome client
+            continue
         players.connection.send(tiles.MessageWelcome(players.idnum).pack())
-        #except:
-         #   ("player has disconnected", players.name)
-            #in_game_clients.remove(players)
-            #in_game_clients = [player for player in in_game_clients if player != players ]
-          #  in_game_clients[:] = [connectedPlayers for connectedPlayers in in_game_clients if not players]
-          #  all_connections.remove(players)
         #Notify client that a new game is starting
         players.connection.send(tiles.MessageGameStart().pack())
         # Notify all already joined clients of new player name and idnum
         dontNotifyId = players.idnum
         for otherPlayers in in_game_clients:
             if(dontNotifyId != otherPlayers.idnum):
+                if(is_socket_closed(otherPlayers.connection)==True):
+                    #do not send anything to this other player as they arent there anymore
+                    continue
                 otherPlayers.connection.send(tiles.MessagePlayerJoined(players.name, players.idnum).pack())
         # Fill new players hand
         for _ in range(tiles.HAND_SIZE):
@@ -95,6 +89,9 @@ def welcome_all_players():
 
 def welcome_spectators():
     for players in spectator_clients:
+        if(is_socket_closed(players.connection)==True):
+            #do not welcome spectator
+            continue
         #Notify client of their id
         players.connection.send(tiles.MessageWelcome(players.idnum).pack())
         #Notify client that a new game is starting
@@ -107,30 +104,28 @@ def welcome_spectators():
 def send_to_all(func):
     global in_game_clients
     global spectator_clients
-    
     for players in in_game_clients:
-        try:
-            players.connection.send(func)
-        except:
-            #ATTEMPT AT TIER3 FOR WHEN A PLAYER LEAVES
-            ("player has disconnected", players.name)
-            in_game_clients = [connectedPlayers for connectedPlayers in in_game_clients if connectedPlayers != players]
-            all_connections.remove(players)
+        if(is_socket_closed(players.connection)==True):
+            #do not notify player
+            continue
+        players.connection.send(func)
+       
     for spectators in spectator_clients:
         #check to see if spectator is still in game
-        try:
-            spectators.connection.send(func)
-        except socket.error:
-            #ATTEMPT AT TIER3 FOR WHEN SPECTATOR LEAVES
-            print("spectator has disconneted ", spectators.name)
-            spectator_clients.remove(spectators)
-            spectator_clients = [connectedSpecs for connectedSpecs in spectator_clients if connectedSpecs != spectators]
-            all_connections.remove(spectators)
+        if(is_socket_closed(spectators.connection)==True):
+            #do not welcome spectator
+            continue
+        spectators.connection.send(func)
+        
 
 #function to send to all of connected clients that may be in game or out of game
 def send_to_all_connected(func):
     for players in all_connections:
+        if(is_socket_closed(players.connection)==True):
+            #player is not connected
+            continue
         players.connection.send(func)
+
 
 def check_elimination(idnum,connection):
     global board
@@ -138,12 +133,14 @@ def check_elimination(idnum,connection):
     global live_idnums
     eliminated = board.do_player_movement(live_idnums)[1]
     if idnum in eliminated:
-                # Let client know they have been eliminated
-                connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+                if(is_socket_closed(connection)==False):
+                    # Let connected client know they have been eliminated
+                    connection.send(tiles.MessagePlayerEliminated(idnum).pack())
                 # remove player from in_game_clients and liveidnums 
                 elimate_player(idnum)
                 # Let all clients know of elimated player
-                send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
+                #moved this to elimate_player()
+                #send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
                 return True
     else:
         return False
@@ -171,32 +168,22 @@ def elimate_player(eliminatedIdnum):
             in_game_clients = [connectedPlayers for connectedPlayers in in_game_clients if connectedPlayers != player]
             print("Player " ,player.name," with id " ,player.idnum," has been eliminated")
             print("after",in_game_clients)
-
+    # Let all clients know of elimated player
+    send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
             
 def play_turn(connection,idnum):
     global live_idnums
     global board
     global buffer
+    if(is_socket_closed(connection)==True):
+            #do not play turn
+            return
     connection.send(tiles.MessagePlayerTurn(idnum).pack())
     chunk = connection.recv(4096)
-    if not chunk:
-        print('client {} disconnected'.format(connection))
-        connection.close()
-        #remove player from connections 
-        for player in all_connections:
-            if player.connection == connection:
-                all_connections.remove(player)
-        # remove player from in_game_clients and liveidnums 
-        elimate_player(idnum)
-        # Let all clients know of disconnected player
-        send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
-        return
-
     buffer.extend(chunk)
     msg, consumed = tiles.read_message_from_bytearray(buffer)
     if not consumed:
         return
-
     buffer = buffer[consumed:]
 
     print('received message {}'.format(msg))
@@ -276,7 +263,8 @@ def client_handler():
                     continue
                 # Let clients know that a new turn has started
                 send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
-                play_turn(players.connection,players.idnum)
+                if(players.idnum in live_idnums):
+                    play_turn(players.connection,players.idnum)
                 check_all_eliminations()
                 # all players have been elimated therefore game is over
                 if(len(live_idnums)==0 or (multiplayer == True and len(live_idnums)==1)):
@@ -299,7 +287,48 @@ def client_handler():
     else:
         print("No more connected clients")
         return
- 
+
+def complete_disconnection(badConnection):
+    global all_connections
+    global all_addresses #i never use all_addresses for anyting
+    global spectator_clients
+    #sever from server
+    badConnection.close()
+    #update connections list
+    all_connections = [connectedClients for connectedClients in all_connections if connectedClients.connection != badConnection]
+    
+    #remove them from in_game_clients if they are a in game player
+    for clients in in_game_clients:
+        if clients.connection == badConnection:
+            elimate_player(clients.idnum)
+    #remove them from spectator_clients if they are a spectator 
+    spectator_clients = [connectedSpectators for connectedSpectators in spectator_clients if connectedSpectators.connection != badConnection]
+
+#https://stackoverflow.com/questions/48024720/python-how-to-check-if-socket-is-still-connected
+#if return false client is still connected
+#if return false client is disconnected and should be removed from all variables and closed its connection
+def is_socket_closed(connection):
+    client_disconnected = False
+    try:
+        # this will try to read bytes without blocking and also without removing them from buffer (peek only)
+        data = connection.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+        if len(data) == 0:
+            client_disconnected = True
+        else:
+            client_disconnected = False
+    except BlockingIOError:
+        return  # socket is open and reading from it would block
+    except ConnectionResetError:
+        client_disconnected = True  # socket was closed for some other reason
+    except Exception as e:
+        #logger.exception("unexpected exception when checking if a socket is closed")
+        client_disconnected = False
+    #if connected client_disconnected would be false here
+    if(client_disconnected ==True):
+        #run complete disconnection from server
+        complete_disconnection(connection)
+    print("before is_cocket_closed return client_disconneted=",client_disconnected)
+    return client_disconnected
 
 # Create a Socket 
 def create_socket():
@@ -359,14 +388,7 @@ def start_commands():
         cmd = input('Input> ')
         if cmd == 'start':
             assign_order()
-            #client_handler()
-        #elif not needed  
-        # #from youtube  
-        elif 'select' in cmd:
-            conn = get_target(cmd)
-            if conn is not None:
-                #send_target_commands(conn)
-                client_handler(conn)
+            
         else:
             print("Command not recognized")
             
@@ -376,6 +398,8 @@ def start_commands():
 # assign a random turn order to connected clients number_connections
 def assign_order():
     # check to see if clients are still connected
+    for clients in all_connections:
+        is_socket_closed(clients.connection)
     print(all_connections)
     #i dont like this, when did i write this lol?
     if(len(all_connections)==0):
@@ -398,25 +422,6 @@ def assign_order():
     client_handler()
     
 
-    
-    
-
-# Selecting the target 
-#from youtube
-def get_target(cmd):
-    try:
-        target = cmd.replace('select ', '')  # target = id
-        target = int(target)
-        conn = all_connections[target]
-        print("You are now connected to :" + str(all_addresses[target][0]))
-        print(str(all_addresses[target][0]) + ">", end="")
-        return conn
-        
-
-    except:
-        print("Selection not valid")
-        return None
-
 
 
 # Create worker threads
@@ -426,18 +431,12 @@ def create_workers():
         t.daemon = True
         t.start()
 
-def connection_alive(conn):
-    print("connection_alive")
-    pollerObject = select.poll()
-
-    pollerObject.register(conn, select.POLLIN)
 # Do next job that is in the queue (handle connections, send commands)
 def work():
     while True:
         x = queue.get()
  
         if x == 1:
-            print('cint')
             create_socket()
             bind_socket()
             accepting_connections()
@@ -457,9 +456,3 @@ def create_jobs():
 
 create_workers()
 create_jobs()
-
-#while True:
-  # handle each new connection independently
- # connection, client_address = sock.accept()
-  ##print('received connection from {}'.format(client_address))
-  #client_handler(connection, client_address)
