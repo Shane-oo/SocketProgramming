@@ -26,7 +26,6 @@ from queue import Queue
 import random
 
 
-import select
 
 #Two things being done simultaneously
 NUMBER_OF_THREADS = 3
@@ -72,6 +71,7 @@ def welcome_all_players():
         if(is_socket_closed(players.connection)==True):
             #do not welcome client
             continue
+        
         players.connection.send(tiles.MessageWelcome(players.idnum).pack())
         #Notify client that a new game is starting
         players.connection.send(tiles.MessageGameStart().pack())
@@ -82,11 +82,14 @@ def welcome_all_players():
                 if(is_socket_closed(otherPlayers.connection)==True):
                     #do not send anything to this other player as they arent there anymore
                     continue
+                
                 otherPlayers.connection.send(tiles.MessagePlayerJoined(players.name, players.idnum).pack())
+                #otherPlayers.connection.send(tiles.MessagePlayerTurn(players.idnum).pack())
         # Fill new players hand
         for _ in range(tiles.HAND_SIZE):
             tileid = tiles.get_random_tileid()
             players.connection.send(tiles.MessageAddTileToHand(tileid).pack())
+        
 
 def welcome_spectators():
     for players in spectator_clients:
@@ -280,11 +283,17 @@ def client_handler():
     gameOver = False
     count = 0
     while (gameOver != True ):
-        print("LIVE_IDNUMS=",live_idnums)
+        #sending a MessagePlayerTurn for everyone at the beginning of the game, 
+        #so that all clients know about all players from the beginning (this will also establish the player colours)
+        for players in in_game_clients:
+            send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
         #check for eliminated players
         check_all_eliminations()
         if(len(live_idnums)>0):
+            #game round loop
             for players in in_game_clients:
+                # Let clients know that a new turn has started
+                #send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
                 # Check to see if player was eliminated by another player
                 if (check_elimination(players.idnum, players.connection)):
                     #player has been eliminated
@@ -292,8 +301,9 @@ def client_handler():
                     continue
                 # Let clients know that a new turn has started
                 send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
-                #if(players.idnum in live_idnums):
-                play_turn(players.connection,players.idnum)
+                #Do not play players turn if they have disconnected 
+                if(players.idnum in live_idnums):
+                    play_turn(players.connection,players.idnum)
                 check_all_eliminations()
                 # all players have been elimated therefore game is over
                 if(len(live_idnums)==0 or (multiplayer == True and len(live_idnums)==1)):
@@ -308,11 +318,8 @@ def client_handler():
             break
     print("OUT OF LOOP")
     if(len(all_connections)>0):
-         # start countdown for new game
-         #could add a check for disconnected here
-        print("befroe send to all connected")
+        # start countdown for new game
         send_to_all_connected(tiles.MessageCountdown().pack())
-        print("after send all to connecres")
         countdown(10)
         assign_order()
     else:
@@ -494,7 +501,6 @@ def work():
             spectator_clients.append(joinedInGameSpect )
             new_spectator(joinedInGameSpect)
            
-
         queue.task_done()
 
 
