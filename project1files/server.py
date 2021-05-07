@@ -305,7 +305,7 @@ def play_turn(player):
     # their second)
     if isinstance(msg, tiles.MessagePlaceTile):
         if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
-            #update what player can play
+            #update whats in players hand
             player.tileHand.remove(msg.tileid)
             #notify clients that placement was successful
             send_to_all(msg.pack())
@@ -324,7 +324,7 @@ def play_turn(player):
             # pickup a new tile
             tileid = tiles.get_random_tileid()
             connection.send(tiles.MessageAddTileToHand(tileid).pack())
-            #update what player can play
+            #update whats in players hand
             player.tileHand.append(tileid)
             # sent by the player in the second turn, to choose their token's
             # starting path
