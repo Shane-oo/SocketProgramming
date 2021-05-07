@@ -215,7 +215,7 @@ def bot_mode(player):
   tileHand = player.tileHand
   turns = player.turns
   
-  
+  print("PLayer",idnum, "has had",turns," turns")
   #board numbers
   brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
   [4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3],
@@ -279,7 +279,7 @@ def play_turn(player):
             return
     connection.send(tiles.MessagePlayerTurn(idnum).pack())
     # Timeout setting
-    connection.settimeout(10)
+    connection.settimeout(3)
     try:
       chunk = connection.recv(4096)
       if chunk:
@@ -544,6 +544,9 @@ def assign_order():
         print("Selected player =",in_game_clients[i].idnum)
         i+=1
     for player in all_connections:
+        # clear variables for repeated games
+        player.turns = 0
+        player.tileHand.clear()
         if player not in in_game_clients:
             spectator_clients.append(player)
             print("spectator =" ,player.idnum)
