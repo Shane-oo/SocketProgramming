@@ -247,6 +247,7 @@ def bot_mode(player):
       if(board.set_tile(x, y, tileId , rotation, idnum) == True):
         send_to_all(tiles.MessagePlaceTile(idnum, tileId, rotation, x, y).pack())
         tilePlaced = True
+        player.tileHand.remove(tileId)
           
     #positionupdates[0] returns MessageMoveToken messages describing all of the
     #updated token positions. send to all clients
@@ -259,8 +260,8 @@ def bot_mode(player):
     #player has been eliminated
     return
   tileid = tiles.get_random_tileid()
+  player.tileHand.append(tileid)
   connection.send(tiles.MessageAddTileToHand(tileid).pack())
-  
   print("END OF  BOT_MODE")
     
   
@@ -279,7 +280,7 @@ def play_turn(player):
             return
     connection.send(tiles.MessagePlayerTurn(idnum).pack())
     # Timeout setting
-    connection.settimeout(3)
+    connection.settimeout(10)
     try:
       chunk = connection.recv(4096)
       if chunk:
@@ -304,8 +305,9 @@ def play_turn(player):
     # their second)
     if isinstance(msg, tiles.MessagePlaceTile):
         if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
-            #notify client that placement was successful
-            #connection.send(msg.pack())
+            #update what player can play
+            player.tileHand.remove(msg.tileid)
+            #notify clients that placement was successful
             send_to_all(msg.pack())
 
             # check for token movement
@@ -322,6 +324,8 @@ def play_turn(player):
             # pickup a new tile
             tileid = tiles.get_random_tileid()
             connection.send(tiles.MessageAddTileToHand(tileid).pack())
+            #update what player can play
+            player.tileHand.append(tileid)
             # sent by the player in the second turn, to choose their token's
             # starting path
     elif isinstance(msg, tiles.MessageMoveToken):
