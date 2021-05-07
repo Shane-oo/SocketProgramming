@@ -382,7 +382,7 @@ def create_socket():
         global s
         host = ""
         port = 30020
-        s = socket.socket()
+        s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 
     except socket.error as msg:
         print("Socket creation error: " + str(msg))
