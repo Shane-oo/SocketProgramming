@@ -112,6 +112,7 @@ def welcome_spectators():
 def new_spectator(joinedInGameSpect):
     global board
     global buffer
+    global live_idnums
     brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
     [4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3],
     [0,4],[1,4],[2,4],[3,4],[4,4]]
@@ -122,27 +123,32 @@ def new_spectator(joinedInGameSpect):
     #Notify client of their id
     joinedInGameSpect.connection.send(tiles.MessageWelcome(joinedInGameSpect.idnum).pack())
      # Notify spectator of playing clients
-    for otherPlayers in in_game_clients:
-        joinedInGameSpect.connection.send(tiles.MessagePlayerJoined(otherPlayers.name, otherPlayers.idnum).pack())
-        joinedInGameSpect.connection.send(tiles.MessagePlayerTurn(otherPlayers.idnum).pack())
-        if otherPlayers.idnum not in live_idnums:
-            joinedInGameSpect.connection.send(tiles.MessagePlayerEliminated(otherPlayers.idnum).pack())
-        
+    for Players in gameOrder:
+        joinedInGameSpect.connection.send(tiles.MessagePlayerJoined(Players.name, Players.idnum).pack())
+        joinedInGameSpect.connection.send(tiles.MessagePlayerTurn(Players.idnum).pack())
+        print(live_idnums)
     index = 0
+    boardIds = []
     for gamerIds in board.tileplaceids:
-
       if(board.tileplaceids[index]!=None):
+        if gamerIds not in boardIds:
+          boardIds.append(gamerIds)
         coords = index
         x = brd[coords][0]
         y = brd[coords][1]
-        print("the x and y",x,y)
+        print("the x and y and id",x,y,gamerIds)
         tileid,rotation = board.get_tile(x, y)[0],board.get_tile(x, y)[1]
         joinedInGameSpect.connection.send(tiles.MessagePlaceTile(board.tileplaceids[index], tileid, rotation, x, y).pack())
       index+=1
-    for idnum in live_idnums:
+
+    for Players in gameOrder:
+      idnum = Players.idnum
       if(board.have_player_position(idnum)):
         x,y,position = board.get_player_position(idnum)[0],board.get_player_position(idnum)[1],board.get_player_position(idnum)[2]
         joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position).pack())
+      if(idnum not in live_idnums and idnum in boardIds):
+        
+        joinedInGameSpect.connection.send(tiles.MessagePlayerEliminated(idnum).pack())
 
 
 #notify all clients of whats been played
@@ -566,7 +572,7 @@ def start_commands():
             print("Command not recognized")
             
 
-
+gameOrder = []
 # Select only four connected clients to play a game
 # assign a random turn order to connected clients number_connections
 def assign_order():
@@ -581,11 +587,13 @@ def assign_order():
     #Clear in_game_clients and spectators for a new round
     in_game_clients.clear()
     spectator_clients.clear()
+    gameOrder.clear()
     randomList = random.sample(range(len(all_connections)), len(all_connections))
     i = 0
     while(i<tiles.PLAYER_LIMIT and i<len(all_connections)):
         in_game_clients.append(all_connections[randomList[i]])
         print("Selected player =",in_game_clients[i].idnum)
+        gameOrder.append(in_game_clients[i])
         i+=1
     for player in all_connections:
         # clear variables for repeated games
