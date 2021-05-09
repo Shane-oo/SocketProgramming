@@ -112,6 +112,9 @@ def welcome_spectators():
 def new_spectator(joinedInGameSpect):
     global board
     global buffer
+    brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
+    [4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3],
+    [0,4],[1,4],[2,4],[3,4],[4,4]]
     if(is_socket_closed(joinedInGameSpect.connection)==True):
             #do not welcome spectator
             return
@@ -125,10 +128,30 @@ def new_spectator(joinedInGameSpect):
         if otherPlayers.idnum not in live_idnums:
             joinedInGameSpect.connection.send(tiles.MessagePlayerEliminated(otherPlayers.idnum).pack())
         
-        joinedInGameSpect.connection.send(tiles.MessagePlayerTurn(otherPlayers.idnum).pack())
+    index = 0
+    for gamerIds in board.tileplaceids:
+      print("CUNT",gamerIds)
+      print(board.tileplaceids[index])
+      if(board.tileplaceids[index]!=None):
+        coords = index
+        x = brd[coords][0]
+        y = brd[coords][1]
+        print("the x and y",x,y)
+        tileid,rotation = board.get_tile(x, y)[0],board.get_tile(x, y)[1]
+        joinedInGameSpect.connection.send(tiles.MessagePlaceTile(board.tileplaceids[index], tileid, rotation, x, y).pack())
+      index+=1
+    for idnum in live_idnums:
+      if(board.have_player_position(idnum)):
+        x,y,position = board.get_player_position(idnum)[0],board.get_player_position(idnum)[1],board.get_player_position(idnum)[2]
+        joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position).pack())
+       #if not board.have_player_position(idnum):
+        #    print( board.tileids)
+         #   print(board.tileplaceids)
+          #  coords = board.tileplaceids.index(idnum)
+        #joinedInGameSpect.connection.send(tiles.MessagePlayerTurn(otherPlayers.idnum).pack())
     
-    joinedInGameSpect.connection.send(tiles.MessagePlaceTile(idnum, tileid, rotation, x, y))
-    joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position))    
+    #joinedInGameSpect.connection.send(tiles.MessagePlaceTile(idnum, tileid, rotation, x, y))
+    #joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position))    
    #attempt at teir4
     #msg, consumed = tiles.read_message_from_bytearray(buffer)
    # if not consumed:
@@ -210,6 +233,7 @@ def bot_mode(player):
   global live_idnums
   global board
   global buffer
+  
   connection = player.connection
   idnum = player.idnum
   tileHand = player.tileHand
@@ -225,6 +249,10 @@ def bot_mode(player):
   [0,4],[1,4],[2,4],[3,4],[4,4]]
   print("Placing Tile/ or Selecting Token for timeout player")
   tilePlaced = False
+
+  if(is_socket_closed(connection)==True):
+    #do not play turn
+    return
     # continue to get random postions and tiles until the tile was successfully placed on board
   while(tilePlaced == False):
       if(turns!=1):
@@ -281,6 +309,9 @@ def bot_mode(player):
     #player has been eliminated
     return
   if(turns!=1):
+    if(is_socket_closed(connection)==True):
+            #do not play turn
+            return
     #pick up a new tile
     tileid = tiles.get_random_tileid()
     player.tileHand.append(tileid)
@@ -303,7 +334,7 @@ def play_turn(player):
             return
     connection.send(tiles.MessagePlayerTurn(idnum).pack())
     # Timeout setting
-    connection.settimeout(3)
+    connection.settimeout(10)
     try:
       chunk = connection.recv(4096)
       if chunk:
