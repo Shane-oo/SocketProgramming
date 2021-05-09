@@ -130,8 +130,7 @@ def new_spectator(joinedInGameSpect):
         
     index = 0
     for gamerIds in board.tileplaceids:
-      print("CUNT",gamerIds)
-      print(board.tileplaceids[index])
+
       if(board.tileplaceids[index]!=None):
         coords = index
         x = brd[coords][0]
@@ -144,23 +143,7 @@ def new_spectator(joinedInGameSpect):
       if(board.have_player_position(idnum)):
         x,y,position = board.get_player_position(idnum)[0],board.get_player_position(idnum)[1],board.get_player_position(idnum)[2]
         joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position).pack())
-       #if not board.have_player_position(idnum):
-        #    print( board.tileids)
-         #   print(board.tileplaceids)
-          #  coords = board.tileplaceids.index(idnum)
-        #joinedInGameSpect.connection.send(tiles.MessagePlayerTurn(otherPlayers.idnum).pack())
-    
-    #joinedInGameSpect.connection.send(tiles.MessagePlaceTile(idnum, tileid, rotation, x, y))
-    #joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position))    
-   #attempt at teir4
-    #msg, consumed = tiles.read_message_from_bytearray(buffer)
-   # if not consumed:
-      # print("CUNT ISNT CONSUMED")
-       # return
-    #buffer = buffer[consumed:]
-    #joinedInGameSpect.connection.send(msg.unpack(buffer))
-    #print("FUCK YOU2")
-   
+
 
 #notify all clients of whats been played
 def send_to_all(func):
@@ -351,6 +334,7 @@ def play_turn(player):
     msg, consumed = tiles.read_message_from_bytearray(buffer)
     if not consumed:
         print("NOT CONSUMED")
+        is_socket_closed(connection)
         return
     buffer = buffer[consumed:]
 
@@ -440,9 +424,12 @@ def client_handler():
                     print("Player was eliminated by another player do not play turn")
                     continue
                 # Let clients know that a new turn has started
-                send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
+                #send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
                 #Do not play players turn if they have disconnected 
                 if(players.idnum in live_idnums):
+                        # Let clients know that a new turn has started
+                    print("TEST1")
+                    send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
                     play_turn(players)
                     players.turns +=1
                 check_all_eliminations()
