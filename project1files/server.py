@@ -214,40 +214,61 @@ def bot_mode(player):
   idnum = player.idnum
   tileHand = player.tileHand
   turns = player.turns
-  
   print("PLayer",idnum, "has had",turns," turns")
-  #board numbers
+  #board border numbers
+  borderSquares = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],
+  [4,1],[0,2],[4,2],[0,3],[4,3],
+  [0,4],[1,4],[2,4],[3,4],[4,4]]
+
   brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
   [4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3],
   [0,4],[1,4],[2,4],[3,4],[4,4]]
-  #border of board
-  borderSquares = [brd[0],brd[1],brd[2],brd[3],brd[4],brd[5],brd[9],brd[10],brd[14],
-  brd[15],brd[19],brd[20],brd[21],brd[22],brd[23],brd[24]]
- 
   print("Placing Tile/ or Selecting Token for timeout player")
   tilePlaced = False
     # continue to get random postions and tiles until the tile was successfully placed on board
   while(tilePlaced == False):
-      position = [0,0]
-      tileId = random.choice(tileHand)
-      if(turns ==0):
-        position = random.choice(borderSquares)
-      elif(turns>1):
-          position[0] = board.get_player_position(player.idnum)[0]
-          position[1] = board.get_player_position(player.idnum)[1]
-          print("Player postion",position)
-      x =  position[0]
-      y =  position[1]
-      rotation = random.randint(0,3)
-      print("tileHand",tileHand)
-      print("titleId",tileId)
-      print("x,y",x,y)
-      print("rot",rotation)
-      #returns false if position not allowed
-      if(board.set_tile(x, y, tileId , rotation, idnum) == True):
-        send_to_all(tiles.MessagePlaceTile(idnum, tileId, rotation, x, y).pack())
-        tilePlaced = True
-        player.tileHand.remove(tileId)
+      if(turns!=1):
+        position = [0,0]
+        tileId = random.choice(tileHand)
+        if(turns ==0):
+          position = random.choice(borderSquares)
+        elif(turns>1):
+            position[0] = board.get_player_position(idnum)[0]
+            position[1] = board.get_player_position(idnum)[1]
+            print("Player postion",position)
+        x =  position[0]
+        y =  position[1]
+        rotation = random.randint(0,3)
+        print("tileHand",tileHand)
+        print("titleId",tileId)
+        print("x,y",x,y)
+        print("rot",rotation)
+        #returns false if position not allowed
+        if(board.set_tile(x, y, tileId , rotation, idnum) == True):
+          send_to_all(tiles.MessagePlaceTile(idnum, tileId, rotation, x, y).pack())
+          tilePlaced = True
+          player.tileHand.remove(tileId)
+      else:
+        print("in else")
+        #players second turn
+        #select a token at random
+        if not board.have_player_position(idnum):
+            print( board.tileids)
+            print(board.tileplaceids)
+            coords = board.tileplaceids.index(idnum)
+            print("shaneeooo",coords)
+            x = brd[coords][0]
+            y = brd[coords][1]
+            print(x)
+            print(y)
+            randPosition = random.randint(0,7)
+            #returns false if position not allowed
+            if board.set_player_start_position(idnum, x, y, randPosition):
+              send_to_all(tiles.MessageMoveToken(idnum, x, y, randPosition).pack())
+              tilePlaced = True
+              
+              
+
           
     #positionupdates[0] returns MessageMoveToken messages describing all of the
     #updated token positions. send to all clients
@@ -259,9 +280,11 @@ def bot_mode(player):
   if (check_elimination(idnum, connection)):
     #player has been eliminated
     return
-  tileid = tiles.get_random_tileid()
-  player.tileHand.append(tileid)
-  connection.send(tiles.MessageAddTileToHand(tileid).pack())
+  if(turns!=1):
+    #pick up a new tile
+    tileid = tiles.get_random_tileid()
+    player.tileHand.append(tileid)
+    connection.send(tiles.MessageAddTileToHand(tileid).pack())
   print("END OF  BOT_MODE")
     
   
@@ -280,7 +303,7 @@ def play_turn(player):
             return
     connection.send(tiles.MessagePlayerTurn(idnum).pack())
     # Timeout setting
-    connection.settimeout(10)
+    connection.settimeout(3)
     try:
       chunk = connection.recv(4096)
       if chunk:
@@ -312,7 +335,6 @@ def play_turn(player):
 
             # check for token movement
             positionupdates = board.do_player_movement(live_idnums)[0]
-
             for msg in positionupdates:
                 # connection.send(msg.pack())
                 send_to_all(msg.pack())
@@ -326,14 +348,14 @@ def play_turn(player):
             connection.send(tiles.MessageAddTileToHand(tileid).pack())
             #update whats in players hand
             player.tileHand.append(tileid)
-            # sent by the player in the second turn, to choose their token's
-            # starting path
+   # sent by the player in the second turn, to choose their token's
+    # starting path
     elif isinstance(msg, tiles.MessageMoveToken):
         if not board.have_player_position(msg.idnum):
             if board.set_player_start_position(msg.idnum, msg.x, msg.y, msg.position):
                 # check for token movement
                 positionupdates = board.do_player_movement(live_idnums) [0]
-                player.currentPos = [msg.x,msg.y]
+                #player.currentPos = [msg.x,msg.y]
                 for msg in positionupdates:
                     #connection.send(msg.pack())
                     send_to_all(msg.pack())
