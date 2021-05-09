@@ -495,7 +495,7 @@ def is_socket_closed(connection):
    # except Exception as e:
         #logger.exception("unexpected exception when checking if a socket is closed")
       # client_disconnected = False
-    #if connected client_disconnected would be false here
+    #if client is connected client_disconnected would be false here
     if(client_disconnected == True):
         #run complete disconnection from server
         complete_disconnection(connection)
