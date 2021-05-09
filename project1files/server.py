@@ -147,7 +147,6 @@ def new_spectator(joinedInGameSpect):
         x,y,position = board.get_player_position(idnum)[0],board.get_player_position(idnum)[1],board.get_player_position(idnum)[2]
         joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position).pack())
       if(idnum not in live_idnums and idnum in boardIds):
-        
         joinedInGameSpect.connection.send(tiles.MessagePlayerEliminated(idnum).pack())
 
 
