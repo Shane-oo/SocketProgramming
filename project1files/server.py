@@ -55,7 +55,6 @@ class Player:
 # this cool countdown function was taken from 
 # https://www.geeksforgeeks.org/how-to-create-a-countdown-timer-using-python/
 def countdown(t):
-    
     while t:
         mins, secs = divmod(t, 60)
         timer = '{:02d}:{:02d}'.format(mins, secs)
@@ -108,11 +107,12 @@ def welcome_spectators():
         for otherPlayers in in_game_clients:
                 players.connection.send(tiles.MessagePlayerJoined(otherPlayers.name, otherPlayers.idnum).pack())
 
-
+# function for when a spectator join mid game
 def new_spectator(joinedInGameSpect):
     global board
     global buffer
     global live_idnums
+    #board x and y positions
     brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
     [4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3],
     [0,4],[1,4],[2,4],[3,4],[4,4]]
@@ -121,22 +121,24 @@ def new_spectator(joinedInGameSpect):
             return
     #let new client catch up to the game state
     #Notify client of their id
-    #joinedInGameSpect.connection.send(tiles.MessageWelcome(joinedInGameSpect.idnum).pack())
+    joinedInGameSpect.connection.send(tiles.MessageWelcome(joinedInGameSpect.idnum).pack())
      # Notify spectator of playing clients
     for Players in gameOrder:
         joinedInGameSpect.connection.send(tiles.MessagePlayerJoined(Players.name, Players.idnum).pack())
         joinedInGameSpect.connection.send(tiles.MessagePlayerTurn(Players.idnum).pack())
-    print(live_idnums)
+    print("live idnums=",live_idnums)
     index = 0
     boardIds = []
     for gamerIds in board.tileplaceids:
       if(board.tileplaceids[index]!=None):
+        #save who has placed tiles on the board
         if gamerIds not in boardIds:
           boardIds.append(gamerIds)
         coords = index
         x = brd[coords][0]
         y = brd[coords][1]
-        print("the x and y and id",x,y,gamerIds)
+        print("the x and y and id of tile on board",x,y,gamerIds)
+        # get what tile is oin this x and y position
         tileid,rotation = board.get_tile(x, y)[0],board.get_tile(x, y)[1]
         joinedInGameSpect.connection.send(tiles.MessagePlaceTile(board.tileplaceids[index], tileid, rotation, x, y).pack())
       index+=1
@@ -144,16 +146,16 @@ def new_spectator(joinedInGameSpect):
     for Players in gameOrder:
       idnum = Players.idnum
       if(board.have_player_position(idnum)):
-        print("do i have the elmineted one",idnum)
-
+        # Get where token currently is
         x,y,position = board.get_player_position(idnum)[0],board.get_player_position(idnum)[1],board.get_player_position(idnum)[2]
         joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position).pack())
       if(idnum not in live_idnums and idnum in boardIds):
+        # let joinedInGameSpect know or eliminated players
         joinedInGameSpect.connection.send(tiles.MessagePlayerEliminated(idnum).pack())
 
 
 #notify all clients of whats been played
-def send_to_all(func):
+def send_to_all(message):
     global in_game_clients
     global spectator_clients
     global board 
@@ -161,31 +163,27 @@ def send_to_all(func):
         if(is_socket_closed(players.connection)==True):
             #do not notify player
             continue
-        players.connection.send(func)
+        players.connection.send(message)
        
     for spectators in spectator_clients:
         #check to see if spectator is still in game
         if(is_socket_closed(spectators.connection)==True):
-            #do not welcome spectator
+            #do not notify spectator
             continue
-        spectators.connection.send(func)
-    #for clients in all_connections:
-        #if(is_socket_closed( clients.connection)==True):
-            #do not welcome spectator
-          #  continue
-        #clients.connection.send(func)
+        spectators.connection.send(message)
+
         
 
 #function to send to all of connected clients that may be in game or out of game
-def send_to_all_connected(func):
+def send_to_all_connected(message):
     global board 
     for players in all_connections:
         if(is_socket_closed(players.connection)==True):
-            #player is not connected
+            #client is not connected
             continue
-        players.connection.send(func)
+        players.connection.send(message)
 
-
+# check elimations
 def check_elimination(idnum,connection):
     global board
     global buffer
