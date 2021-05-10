@@ -219,6 +219,7 @@ def elimate_player(eliminatedIdnum):
     # Let all clients know of elimated player
     send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
     #does the eliminated player become a spectator??
+    
  
 # enter bot_mode when socket timeout after no activity for 10s
 def bot_mode(player):
@@ -278,8 +279,7 @@ def bot_mode(player):
             randPosition = random.randint(0,7)
             #returns false if position not allowed
             if board.set_player_start_position(idnum, x, y, randPosition):
-              print(x)
-              print(y)
+              print("placing starting tokent at",x,y)
               send_to_all(tiles.MessageMoveToken(idnum, x, y, randPosition).pack())
               tilePlaced = True
       
