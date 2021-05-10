@@ -24,7 +24,6 @@ import threading
 import time
 from queue import Queue
 import random
-import struct
 from random import randrange
 
 #Two things being done simultaneously
@@ -42,7 +41,6 @@ board = None
 
 gameOver = None
 
-board_events = []
 
 class Player:
     def __init__(self,connection,idnum,tileHand,turns,currentPos):
@@ -69,6 +67,7 @@ def countdown(t):
 
 #intialise the game for all clients and notify all clients of new joining client
 def welcome_all_players():
+    global board 
     #intialise the game for all clients
     for players in in_game_clients:
         if(is_socket_closed(players.connection)==True):
@@ -96,6 +95,7 @@ def welcome_all_players():
         
 
 def welcome_spectators():
+    global board 
     for players in spectator_clients:
         if(is_socket_closed(players.connection)==True):
             #do not welcome spectator
@@ -144,6 +144,8 @@ def new_spectator(joinedInGameSpect):
     for Players in gameOrder:
       idnum = Players.idnum
       if(board.have_player_position(idnum)):
+        print("do i have the elmineted one",idnum)
+
         x,y,position = board.get_player_position(idnum)[0],board.get_player_position(idnum)[1],board.get_player_position(idnum)[2]
         joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position).pack())
       if(idnum not in live_idnums and idnum in boardIds):
@@ -154,6 +156,7 @@ def new_spectator(joinedInGameSpect):
 def send_to_all(func):
     global in_game_clients
     global spectator_clients
+    global board 
     for players in in_game_clients:
         if(is_socket_closed(players.connection)==True):
             #do not notify player
@@ -166,10 +169,16 @@ def send_to_all(func):
             #do not welcome spectator
             continue
         spectators.connection.send(func)
+    #for clients in all_connections:
+        #if(is_socket_closed( clients.connection)==True):
+            #do not welcome spectator
+          #  continue
+        #clients.connection.send(func)
         
 
 #function to send to all of connected clients that may be in game or out of game
 def send_to_all_connected(func):
+    global board 
     for players in all_connections:
         if(is_socket_closed(players.connection)==True):
             #player is not connected
@@ -197,6 +206,7 @@ def check_elimination(idnum,connection):
 
 def check_all_eliminations():
     global live_idnums
+    global board 
     for idnums in live_idnums:
         for players in in_game_clients:
             if idnums == players.idnum:
@@ -207,6 +217,7 @@ def check_all_eliminations():
 def elimate_player(eliminatedIdnum):
     global live_idnums
     global in_game_clients
+    global board 
     #print("remove live idnum:",live_idnums.remove(eliminatedIdnum))
     live_idnums = [aliveIds for aliveIds in live_idnums if aliveIds != eliminatedIdnum]
     # Let all clients know of elimated player
@@ -214,8 +225,15 @@ def elimate_player(eliminatedIdnum):
     for player in in_game_clients:
         if(player.idnum == eliminatedIdnum):
             in_game_clients = [connectedPlayers for connectedPlayers in in_game_clients if connectedPlayers != player]
-    send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
+            #new_spectator(player)
 
+    send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
+    #does the eliminated player become a spectator
+    for players in all_connections:
+      if players.idnum == eliminatedIdnum:
+        print("")
+        #new_spectator(players)
+        #spectator_clients.append(players)
 
 def bot_mode(player):
   global live_idnums
@@ -262,6 +280,7 @@ def bot_mode(player):
         #returns false if position not allowed
         if(board.set_tile(x, y, tileId , rotation, idnum) == True):
           send_to_all(tiles.MessagePlaceTile(idnum, tileId, rotation, x, y).pack())
+          print(board.tileplaceids)
           tilePlaced = True
           player.tileHand.remove(tileId)
       else:
@@ -295,6 +314,7 @@ def bot_mode(player):
   # check to see if players token has been eliminated
   if (check_elimination(idnum, connection)):
     #player has been eliminated
+    print("DUDES been eliminated")
     return
   if(turns!=1):
     if(is_socket_closed(connection)==True):
@@ -439,6 +459,7 @@ def client_handler():
                     send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
                     play_turn(players)
                     players.turns +=1
+                    print("SHANEEEE,", board.tileplaceids)
                 check_all_eliminations()
                 # all players have been elimated therefore game is over
                 if(len(live_idnums)==0 or (multiplayer == True and len(live_idnums)==1)):
