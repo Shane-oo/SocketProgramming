@@ -121,12 +121,12 @@ def new_spectator(joinedInGameSpect):
             return
     #let new client catch up to the game state
     #Notify client of their id
-    joinedInGameSpect.connection.send(tiles.MessageWelcome(joinedInGameSpect.idnum).pack())
+    #joinedInGameSpect.connection.send(tiles.MessageWelcome(joinedInGameSpect.idnum).pack())
      # Notify spectator of playing clients
     for Players in gameOrder:
         joinedInGameSpect.connection.send(tiles.MessagePlayerJoined(Players.name, Players.idnum).pack())
         joinedInGameSpect.connection.send(tiles.MessagePlayerTurn(Players.idnum).pack())
-        print(live_idnums)
+    print(live_idnums)
     index = 0
     boardIds = []
     for gamerIds in board.tileplaceids:
@@ -348,6 +348,8 @@ def play_turn(player):
     # their second)
     if isinstance(msg, tiles.MessagePlaceTile):
         if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
+            print("titleId",msg.tileid)
+            print("tilehand",player.tileHand)
             #update whats in players hand
             player.tileHand.remove(msg.tileid)
             #notify clients that placement was successful
@@ -629,7 +631,7 @@ def work():
         if x == 2:
             #print("-"*80+"\n" + "-"*15+"ENTER 'start' TO COMMENCE GAME AT ANY TIME"+"-"*20 +"\n"+"-"*80)
             #wait for players to join then start game
-            countdown(8)
+            countdown(10)
             #start_commands()
             assign_order()
             queue.put(2)
