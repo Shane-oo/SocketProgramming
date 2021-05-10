@@ -1,10 +1,7 @@
 # CITS3002 2021 Assignment
-#
+# Shane Monck 22501734
 # This file implements a basic server that allows a single client to play a
-# single game with no other participants, and very little error checking.
 #
-# Any other clients that connect during this time will need to wait for the
-# first client's game to complete.
 #
 # Your task will be to write a new server that adds all connected clients into
 # a pool of players. When enough players are available (two or more), the server
@@ -41,7 +38,9 @@ board = None
 
 gameOver = None
 
-
+brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
+  [4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3],
+  [0,4],[1,4],[2,4],[3,4],[4,4]]
 class Player:
     def __init__(self,connection,idnum,tileHand,turns,currentPos):
         self.connection = connection
@@ -92,7 +91,7 @@ def welcome_all_players():
             players.connection.send(tiles.MessageAddTileToHand(tileid).pack())
             players.tileHand.append(tileid)
         
-
+# intialise the game for all spectator clients and notify them of all in game clients
 def welcome_spectators():
     global board 
     for players in spectator_clients:
@@ -112,10 +111,7 @@ def new_spectator(joinedInGameSpect):
     global board
     global buffer
     global live_idnums
-    #board x and y positions
-    brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
-    [4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3],
-    [0,4],[1,4],[2,4],[3,4],[4,4]]
+
     if(is_socket_closed(joinedInGameSpect.connection)==True):
             #do not welcome spectator
             return
@@ -190,15 +186,12 @@ def check_elimination(idnum,connection):
     global live_idnums
     eliminated = board.do_player_movement(live_idnums)[1]
     if idnum in eliminated:
-                if(is_socket_closed(connection)==False):
-                    # Let connected client know they have been eliminated
-                    connection.send(tiles.MessagePlayerEliminated(idnum).pack())
-                # remove player from in_game_clients and liveidnums 
-                elimate_player(idnum)
-                # Let all clients know of elimated player
-                #moved this to elimate_player()
-                #send_to_all(tiles.MessagePlayerEliminated(idnum).pack())
-                return True
+      if(is_socket_closed(connection)==False):
+        # Let connected client know they have been eliminated
+        connection.send(tiles.MessagePlayerEliminated(idnum).pack())
+        # remove player from in_game_clients and liveidnums 
+        elimate_player(idnum)
+        return True
     else:
         return False
 
@@ -216,44 +209,33 @@ def elimate_player(eliminatedIdnum):
     global live_idnums
     global in_game_clients
     global board 
-    #print("remove live idnum:",live_idnums.remove(eliminatedIdnum))
+    print("before updating live idnums",live_idnums)
     live_idnums = [aliveIds for aliveIds in live_idnums if aliveIds != eliminatedIdnum]
-    # Let all clients know of elimated player
-    #send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
+    print("after updating live idnums for eliminated player ",live_idnums,"id",eliminatedIdnum,"eliminated")
+    # remove from in_game_clients
     for player in in_game_clients:
         if(player.idnum == eliminatedIdnum):
             in_game_clients = [connectedPlayers for connectedPlayers in in_game_clients if connectedPlayers != player]
-            #new_spectator(player)
-
+    # Let all clients know of elimated player
     send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
-    #does the eliminated player become a spectator
-    for players in all_connections:
-      if players.idnum == eliminatedIdnum:
-        print("")
-        #new_spectator(players)
-        #spectator_clients.append(players)
-
+    #does the eliminated player become a spectator??
+ 
+# enter bot_mode when socket timeout after no activity for 10s
 def bot_mode(player):
   global live_idnums
   global board
   global buffer
-  
   connection = player.connection
   idnum = player.idnum
   tileHand = player.tileHand
   turns = player.turns
   print("PLayer",idnum, "has had",turns," turns")
   #board border numbers
-  borderSquares = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],
-  [4,1],[0,2],[4,2],[0,3],[4,3],
-  [0,4],[1,4],[2,4],[3,4],[4,4]]
+  borderSquares = [brd[0],brd[1],brd[2],brd[3],brd[4],brd[5],brd[9],brd[10],brd[14],brd[15],brd[19],brd[20],
+  brd[21],brd[22],brd[23],brd[24]]
 
-  brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
-  [4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[0,3],[1,3],[2,3],[3,3],[4,3],
-  [0,4],[1,4],[2,4],[3,4],[4,4]]
   print("Placing Tile/ or Selecting Token for timeout player")
   tilePlaced = False
-
   if(is_socket_closed(connection)==True):
     #do not play turn
     return
@@ -261,71 +243,64 @@ def bot_mode(player):
   while(tilePlaced == False):
       if(turns!=1):
         position = [0,0]
+        # choose random tile from players hand
         tileId = random.choice(tileHand)
         if(turns ==0):
+          # place tile on board's border
           position = random.choice(borderSquares)
         elif(turns>1):
+            # find x and y of tokens current position on board
             position[0] = board.get_player_position(idnum)[0]
             position[1] = board.get_player_position(idnum)[1]
             print("Player postion",position)
         x =  position[0]
         y =  position[1]
         rotation = random.randint(0,3)
-        print("tileHand",tileHand)
-        print("titleId",tileId)
-        print("x,y",x,y)
-        print("rot",rotation)
+        
         #returns false if position not allowed
         if(board.set_tile(x, y, tileId , rotation, idnum) == True):
+          print("tileHand",tileHand)
+          print("titleId",tileId)
+          print("x,y",x,y)
+          print("rot",rotation)
           send_to_all(tiles.MessagePlaceTile(idnum, tileId, rotation, x, y).pack())
-          print(board.tileplaceids)
+          print("whole board ids",board.tileplaceids)
           tilePlaced = True
           player.tileHand.remove(tileId)
       else:
-        print("in else")
         #players second turn
         #select a token at random
         if not board.have_player_position(idnum):
-            print( board.tileids)
-            print(board.tileplaceids)
             coords = board.tileplaceids.index(idnum)
-            print("shaneeooo",coords)
             x = brd[coords][0]
             y = brd[coords][1]
-            print(x)
-            print(y)
+            # choose a starting token position at random
             randPosition = random.randint(0,7)
             #returns false if position not allowed
             if board.set_player_start_position(idnum, x, y, randPosition):
+              print(x)
+              print(y)
               send_to_all(tiles.MessageMoveToken(idnum, x, y, randPosition).pack())
               tilePlaced = True
-              
-              
-
-          
+      
     #positionupdates[0] returns MessageMoveToken messages describing all of the
     #updated token positions. send to all clients
   positionupdates = board.do_player_movement(live_idnums)[0]
-  print("pos = ",positionupdates)
-  for func in positionupdates:
-    send_to_all(func.pack())
+  for messages in positionupdates:
+    send_to_all(messages.pack())
   # check to see if players token has been eliminated
   if (check_elimination(idnum, connection)):
     #player has been eliminated
-    print("DUDES been eliminated")
     return
   if(turns!=1):
     if(is_socket_closed(connection)==True):
-            #do not play turn
+            #do not play turn client is no longer there
             return
     #pick up a new tile
     tileid = tiles.get_random_tileid()
     player.tileHand.append(tileid)
     connection.send(tiles.MessageAddTileToHand(tileid).pack())
   print("END OF  BOT_MODE")
-    
-  
-
 
 def play_turn(player):
     global live_idnums
@@ -338,6 +313,7 @@ def play_turn(player):
     if(is_socket_closed(connection)==True):
             #do not play turn
             return
+    # let client know its their turn
     connection.send(tiles.MessagePlayerTurn(idnum).pack())
     # Timeout setting
     connection.settimeout(10)
@@ -345,14 +321,12 @@ def play_turn(player):
       chunk = connection.recv(4096)
       if chunk:
         connection.settimeout(None)
-        print("client was placed turn in")
+        print("client responded in time")
     except socket.timeout:
       connection.settimeout(None)
       print("BOT MODE ACTIVATED")
       bot_mode(player)
-      #chunk = connection.recv(4096)
       return
-      
     buffer.extend(chunk)
     msg, consumed = tiles.read_message_from_bytearray(buffer)
     if not consumed:
@@ -360,7 +334,6 @@ def play_turn(player):
         is_socket_closed(connection)
         return
     buffer = buffer[consumed:]
-
     print('received message {}'.format(msg))
     # sent by the player to put a tile onto the board (in all turns except
     # their second)
@@ -372,17 +345,14 @@ def play_turn(player):
             player.tileHand.remove(msg.tileid)
             #notify clients that placement was successful
             send_to_all(msg.pack())
-
             # check for token movement
             positionupdates = board.do_player_movement(live_idnums)[0]
             for msg in positionupdates:
-                # connection.send(msg.pack())
                 send_to_all(msg.pack())
             # check to see if players token has been eliminated
             if (check_elimination(idnum, connection)):
                 #player has been eliminated
                 return
-
             # pickup a new tile
             tileid = tiles.get_random_tileid()
             connection.send(tiles.MessageAddTileToHand(tileid).pack())
@@ -405,11 +375,11 @@ def play_turn(player):
                     return
                 
 
-
 def client_handler():
     global gameOver
     global live_idnums
-
+    global board 
+    global buffer
     live_idnums = []
     #intialise live_idnums with all in_game_clients ids
     for players in in_game_clients:
@@ -422,15 +392,12 @@ def client_handler():
     # Add the four players into the game and give them their starting hand    
     welcome_all_players()
     welcome_spectators()
-    # must use globals
-    global board 
+
     board = tiles.Board()
-    global buffer
     buffer = bytearray()
     #Start playing loop
 
     gameOver = False
-    count = 0
     while (gameOver != True ):
         #sending a MessagePlayerTurn for everyone at the beginning of the game, 
         #so that all clients know about all players from the beginning (this will also establish the player colours)
@@ -441,23 +408,19 @@ def client_handler():
         if(len(live_idnums)>0):
             #game round loop
             for players in in_game_clients:
-                # Let clients know that a new turn has started
-                #send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
+
                 # Check to see if player was eliminated by another player
                 if (check_elimination(players.idnum, players.connection)):
                     #player has been eliminated
                     print("Player was eliminated by another player do not play turn")
                     continue
-                # Let clients know that a new turn has started
-                #send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
                 #Do not play players turn if they have disconnected 
                 if(players.idnum in live_idnums):
-                        # Let clients know that a new turn has started
-                    print("TEST1")
+                    # Let clients know that a new turn has started
                     send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
+                    # have player sned their turn message and update board accordingly
                     play_turn(players)
                     players.turns +=1
-                    print("SHANEEEE,", board.tileplaceids)
                 check_all_eliminations()
                 # all players have been elimated therefore game is over
                 if(len(live_idnums)==0 or (multiplayer == True and len(live_idnums)==1)):
@@ -480,6 +443,7 @@ def client_handler():
         print("No more connected clients")
         return
 
+# client has disconnected and needs to be removed from all variables
 def complete_disconnection(badConnection):
     global all_connections
     global all_addresses #i never use all_addresses for anyting
@@ -488,15 +452,11 @@ def complete_disconnection(badConnection):
     badConnection.close()
     #update connections list
     all_connections = [connectedClients for connectedClients in all_connections if connectedClients.connection != badConnection]
-    
     #remove them from in_game_clients if they are a in game player
     for clients in in_game_clients:
-      
         if clients.connection == badConnection:
             elimate_player(clients.idnum)
             send_to_all(tiles.MessagePlayerLeft(clients.idnum).pack())
-
-
     #remove them from spectator_clients if they are a spectator 
     spectator_clients = [connectedSpectators for connectedSpectators in spectator_clients if connectedSpectators.connection != badConnection]
 
@@ -518,9 +478,6 @@ def is_socket_closed(connection):
         client_disconnected = True  # socket was closed for some other reason
     except  socket.error:
         client_disconnected = True
-   # except Exception as e:
-        #logger.exception("unexpected exception when checking if a socket is closed")
-      # client_disconnected = False
     #if client is connected client_disconnected would be false here
     if(client_disconnected == True):
         #run complete disconnection from server
@@ -576,21 +533,12 @@ def accepting_connections():
             print("Connection has been established :" + address[0])
             if(gameOver==False):
                 print("client joined while game in progress")
+                # place thread that handles in game joins in queue
                 queue.put(3)
         except:
             print("Error accepting connections")
     
 
-
-def start_commands():
-    while True:
-        cmd = input('Input> ')
-        if cmd == 'start':
-            assign_order()
-            
-        else:
-            print("Command not recognized")
-            
 
 gameOrder = []
 # Select only four connected clients to play a game
@@ -599,8 +547,6 @@ def assign_order():
     # check to see if clients are still connected
     for clients in all_connections:
         is_socket_closed(clients.connection)
-    print(all_connections)
-    #i dont like this, when did i write this lol?
     if(len(all_connections)==0):
         print("All clients disconnected")
         return -1
@@ -612,7 +558,7 @@ def assign_order():
     i = 0
     while(i<tiles.PLAYER_LIMIT and i<len(all_connections)):
         in_game_clients.append(all_connections[randomList[i]])
-        print("Selected player =",in_game_clients[i].idnum)
+        print("Selected player id =",in_game_clients[i].idnum)
         gameOrder.append(in_game_clients[i])
         i+=1
     for player in all_connections:
@@ -621,12 +567,10 @@ def assign_order():
         player.tileHand.clear()
         if player not in in_game_clients:
             spectator_clients.append(player)
-            print("spectator =" ,player.idnum)
-
+            print("spectator id =" ,player.idnum)
+    # start game
     client_handler()
     
-
-
 
 # Create worker threads
 def create_workers():
@@ -635,26 +579,22 @@ def create_workers():
         t.daemon = True
         t.start()
 
-# Do next job that is in the queue (handle connections, send commands)
+# Do next job that is in the queue 
 def work():
-
     while True:
         x = queue.get()
- 
         if x == 1:
             create_socket()
             bind_socket()
             accepting_connections()
-             #in the middle of the game become a spectator
             
         if x == 2:
-            #print("-"*80+"\n" + "-"*15+"ENTER 'start' TO COMMENCE GAME AT ANY TIME"+"-"*20 +"\n"+"-"*80)
             #wait for players to join then start game
             countdown(10)
-            #start_commands()
             assign_order()
+            # if no players have joined countdown will start again until there is connected clients
             queue.put(2)
-        if x==3:
+        if x ==3 :
             joinedInGameSpect = all_connections[-1]
             spectator_clients.append(joinedInGameSpect )
             new_spectator(joinedInGameSpect)
