@@ -11,9 +11,9 @@ import time
 from enum import IntEnum
 
 
-MAXIMUM_TIME_BETWEEN_RECEIVED_MESSAGES = 11
+MAXIMUM_TIME_BETWEEN_RECEIVED_MESSAGES = 10
 TURN_THINKING_TIME = 0.2
-STATE_MISMATCH_TIME = 2
+STATE_MISMATCH_TIME = 0.4
 
 
 if len(sys.argv) < 2:
@@ -569,7 +569,7 @@ class Tester:
     result = ProcessEventResult.NOTHING_EXCITING
 
     clientid, msg = self.events.get()
-    
+    time.sleep(0.01)
     # print('{}: {}'.format(clientid, msg))
 
     if isinstance(msg, EvServerTerminated):
