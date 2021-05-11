@@ -35,7 +35,7 @@ in_game_clients = []
 spectator_clients = []
 buffer = None
 board = None
-
+clientCount = 0
 gameOver = None
 
 brd = [[0,0],[1,0],[2,0], [3,0],[4,0],[0,1],[1,1],[2,1],[3,1],
@@ -147,8 +147,10 @@ def new_spectator(joinedInGameSpect):
         joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position).pack())
       if(idnum not in live_idnums and idnum in boardIds):
         # let joinedInGameSpect know or eliminated players
+        
         joinedInGameSpect.connection.send(tiles.MessagePlayerEliminated(idnum).pack())
 
+    
 
 #notify all clients of whats been played
 def send_to_all(message):
@@ -219,6 +221,11 @@ def elimate_player(eliminatedIdnum):
     # Let all clients know of elimated player
     send_to_all(tiles.MessagePlayerEliminated(eliminatedIdnum).pack())
     #does the eliminated player become a spectator??
+    for clients in all_connections:
+        if clients not in in_game_clients and clients not in spectator_clients:
+            spectator_clients.append(clients)
+    
+    
     
  
 # enter bot_mode when socket timeout after no activity for 10s
@@ -517,6 +524,7 @@ def bind_socket():
 # Handling connection from multiple clients and saving to a list
 # Closing previous connections when server.py file is restarted
 def accepting_connections():
+    global clientCount
     for c in all_connections:
         c.close()
 
@@ -527,10 +535,11 @@ def accepting_connections():
         try:
             conn, address = s.accept()
             s.setblocking(1)  # prevents timeout
-            all_connections.append(Player(conn, len(all_connections),[],0,[]))
+            all_connections.append(Player(conn, clientCount,[],0,[]))
             all_addresses.append(address)
            
             print("Connection has been established :" + address[0])
+            clientCount +=1
             if(gameOver==False):
                 print("client joined while game in progress")
                 # place thread that handles in game joins in queue
@@ -544,6 +553,10 @@ gameOrder = []
 # Select only four connected clients to play a game
 # assign a random turn order to connected clients number_connections
 def assign_order():
+
+    global in_game_clients
+    global spectator_clients
+    global gameOrder
     # check to see if clients are still connected
     for clients in all_connections:
         is_socket_closed(clients.connection)
@@ -554,6 +567,7 @@ def assign_order():
     in_game_clients.clear()
     spectator_clients.clear()
     gameOrder.clear()
+ 
     randomList = random.sample(range(len(all_connections)), len(all_connections))
     i = 0
     while(i<tiles.PLAYER_LIMIT and i<len(all_connections)):
@@ -596,8 +610,9 @@ def work():
             queue.put(2)
         if x ==3 :
             joinedInGameSpect = all_connections[-1]
-            spectator_clients.append(joinedInGameSpect )
+            
             new_spectator(joinedInGameSpect)
+            spectator_clients.append(joinedInGameSpect )
            
         queue.task_done()
 
