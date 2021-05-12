@@ -405,29 +405,36 @@ class Board:
     method will return True.
     """
     if self.have_player_position(idnum):
+      print("HAVEPLAYERPOS")
       return False
     
     # does the tile exist?
     idx = self.tile_index(x, y)
     if self.tileids[idx] == None:
+      print("TILEDOESNTEXIST")
       return False
     
     # does the player own the tile?
     if self.tileplaceids[idx] != idnum:
+      print("DONT OWN TILE")
       return False
 
     # is position in tile valid?
     if (position == 0 or position == 1) and y != BOARD_HEIGHT - 1:
+      print("NOT A VALID POS1",position,y,BOARD_HEIGHT-1)
       return False
     if (position == 2 or position == 3) and x != BOARD_WIDTH - 1:
+      print("NOT A VALID POS2")
       return False
     if (position == 4 or position == 5) and y != 0:
+      print("NOT A VALID POS3")
       return False
     if (position == 6 or position == 7) and x != 0:
+      print("NOT A VALID POS4")
       return False
 
     self.update_player_position(idnum, x, y, position)
-
+    print("VALID",position,x,y)
     return True
   
   def do_player_movement(self, live_idnums):

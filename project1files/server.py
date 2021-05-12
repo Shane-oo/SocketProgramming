@@ -239,30 +239,28 @@ def elimate_player(eliminatedIdnum):
         if clients not in in_game_clients and clients not in spectator_clients:
             spectator_clients.append(clients)
     
-    
-    
- 
+
 # enter bot_mode when socket timeout after no activity for 10s
 def bot_mode(player):
-  global live_idnums
-  global board
-  global buffer
-  connection = player.connection
-  idnum = player.idnum
-  tileHand = player.tileHand
-  turns = player.turns
-  print("PLayer",idnum, "has had",turns," turns")
-  #board border numbers
-  borderSquares = [brd[0],brd[1],brd[2],brd[3],brd[4],brd[5],brd[9],brd[10],brd[14],brd[15],brd[19],brd[20],
-  brd[21],brd[22],brd[23],brd[24]]
+    global live_idnums
+    global board
+    global buffer
+    connection = player.connection
+    idnum = player.idnum
+    tileHand = player.tileHand
+    turns = player.turns
+    print("PLayer",idnum, "has had",turns," turns")
+    #board border numbers
+    borderSquares = [brd[0],brd[1],brd[2],brd[3],brd[4],brd[5],brd[9],brd[10],brd[14],brd[15],brd[19],brd[20],
+    brd[21],brd[22],brd[23],brd[24]]
 
-  print("Placing Tile/ or Selecting Token for timeout player")
-  tilePlaced = False
-  if(is_socket_closed(connection)==True):
-    #do not play turn
-    return
+    print("Placing Tile/ or Selecting Token for timeout player")
+    tilePlaced = False
+    if(is_socket_closed(connection)==True):
+        #do not play turn
+        return
     # continue to get random postions and tiles until the tile was successfully placed on board
-  while(tilePlaced == False):
+    while(tilePlaced == False):
       if(turns!=1):
         position = [0,0]
         # choose random tile from players hand
@@ -297,31 +295,36 @@ def bot_mode(player):
             x = brd[coords][0]
             y = brd[coords][1]
             # choose a starting token position at random
-            randPosition = random.randint(0,7)
+            # anm i picking a randPosition that if for this tile?
+  
+            randPosition = random.randint(0, 7)
+        
+            print("setting token at id,x,y,pos",idnum,x,y,randPosition)
             #returns false if position not allowed
             if board.set_player_start_position(idnum, x, y, randPosition):
-              print("placing starting tokent at",x,y)
+              print("placing starting tokent at",x,y,randPosition)
               send_to_all(tiles.MessageMoveToken(idnum, x, y, randPosition).pack())
               tilePlaced = True
       
     #positionupdates[0] returns MessageMoveToken messages describing all of the
     #updated token positions. send to all clients
-  positionupdates = board.do_player_movement(live_idnums)[0]
-  for messages in positionupdates:
-    send_to_all(messages.pack())
-  # check to see if players token has been eliminated
-  if (check_elimination(idnum, connection)):
-    #player has been eliminated
-    return
-  if(turns!=1):
-    if(is_socket_closed(connection)==True):
+    positionupdates = board.do_player_movement(live_idnums)[0]
+    for messages in positionupdates:
+        send_to_all(messages.pack())
+    # check to see if players token has been eliminated
+    if (check_elimination(idnum, connection)):
+        #player has been eliminated
+        return
+    if(turns!=1):
+        if(is_socket_closed(connection)==True):
             #do not play turn client is no longer there
             return
-    #pick up a new tile
-    tileid = tiles.get_random_tileid()
-    player.tileHand.append(tileid)
-    connection.send(tiles.MessageAddTileToHand(tileid).pack())
-  print("END OF  BOT_MODE")
+        #pick up a new tile
+        tileid = tiles.get_random_tileid()
+        player.tileHand.append(tileid)
+        connection.send(tiles.MessageAddTileToHand(tileid).pack())
+    player.turns +=1
+    print("END OF  BOT_MODE")
 
 def play_turn(player):
     global live_idnums
@@ -339,7 +342,7 @@ def play_turn(player):
     # let client know its their turn
     connection.send(tiles.MessagePlayerTurn(idnum).pack())
     # Timeout setting
-    connection.settimeout(10)
+    connection.settimeout(4)
     try:
         chunk = connection.recv(4096)
         if chunk:
@@ -358,7 +361,6 @@ def play_turn(player):
         print("NOT CONSUMED")
         is_socket_closed(connection)
         return
-    print("DNSMooJNDO",buffer)
     buffer = buffer[consumed:]
     print('received message {}'.format(msg))
     # sent by the player to put a tile onto the board (in all turns except
@@ -388,9 +390,9 @@ def play_turn(player):
                 connection.send(tiles.MessageAddTileToHand(tileid).pack())
                 #update whats in players hand
                 player.tileHand.append(tileid)
+                player.turns +=1
             else:
                 print("NOT VALID TURN GO AGAIN")
-                
                 return
        
    # sent by the player in the second turn, to choose their token's
@@ -408,6 +410,7 @@ def play_turn(player):
                 if (check_elimination(idnum, connection)):
                     #player has been eliminated
                     return
+                player.turns +=1
             else:
 
                 print("NOT VALID TURN")
@@ -463,7 +466,7 @@ def client_handler():
                     send_to_all(tiles.MessagePlayerTurn(players.idnum).pack())
                     # have player sned their turn message and update board accordingly
                     play_turn(players)
-                    players.turns +=1
+                    
                 check_all_eliminations()
                 # all players have been elimated therefore game is over
                 if(len(live_idnums)==0 or (multiplayer == True and len(live_idnums)==1)):
@@ -480,7 +483,6 @@ def client_handler():
     if(len(all_connections)>0):
         # start countdown for new game
         send_to_all_connected(tiles.MessageCountdown().pack())
-        
         countdown(10)
         assign_order()
     else:
@@ -509,9 +511,13 @@ def complete_disconnection(badConnection):
 #if return false client is disconnected and should be removed from all variables and closed its connection
 def is_socket_closed(connection):
     client_disconnected = False
+    #win32
+    # connection.setblocking(0)
     try:
         # this will try to read bytes without blocking and also without removing them from buffer (peek only)
         data = connection.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+        #win32
+        # data = connection.rec(16,0)
         if not data:
             client_disconnected = True
         else:
@@ -526,6 +532,9 @@ def is_socket_closed(connection):
     if(client_disconnected == True):
         #run complete disconnection from server
         complete_disconnection(connection)
+    #win32
+    #if(client_disconnected ==False):
+        #connection.setblocking(1)
     return client_disconnected
 
 # Create a Socket 
@@ -647,9 +656,9 @@ def work():
             queue.put(2)
         if x ==3 :
             joinedInGameSpect = all_connections[-1]
-            
-            new_spectator(joinedInGameSpect)
             spectator_clients.append(joinedInGameSpect )
+            new_spectator(joinedInGameSpect)
+            #spectator_clients.append(joinedInGameSpect )
            
         queue.task_done()
 

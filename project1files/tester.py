@@ -12,8 +12,8 @@ from enum import IntEnum
 
 
 MAXIMUM_TIME_BETWEEN_RECEIVED_MESSAGES = 15
-TURN_THINKING_TIME = 0.5
-STATE_MISMATCH_TIME = 5
+TURN_THINKING_TIME = 0.4
+STATE_MISMATCH_TIME = 0.4
 
 
 if len(sys.argv) < 2:
@@ -293,7 +293,6 @@ class Client:
                     self.putevent(EvTurn())
                 self.putevent(EvUpdated())
               elif isinstance(msg, tiles.MessagePlaceTile):
-                self.print('player {} puts tile {} at {}, {} : {}'.format(msg.idnum, msg.tileid, msg.x, msg.y, msg.rotation))
                 with infolock:
                   if msg.idnum not in self.playernames:
                     raise RuntimeError('unknown playerid {}'.format(msg.idnum))
@@ -556,8 +555,7 @@ class Tester:
   def check_all_states_match(self):
     for client in self.clients:
       if not client.check_basic_state(len(self.clients)):
-        # raise Exception('{}: basic state not ready'.format(client.localid))
-        pass
+        raise Exception('{}: basic state not ready'.format(client.localid))
     
     boardsequal, reason = self.all_clients_have_expected_board()
     if not boardsequal:
@@ -571,12 +569,10 @@ class Tester:
     result = ProcessEventResult.NOTHING_EXCITING
 
     clientid, msg = self.events.get()
-    
-    print('{}: {}'.format(clientid, msg))
+    time.sleep(0.01)
+    # print('{}: {}'.format(clientid, msg))
 
-    if isinstance(msg, Exception):
-      raise Exception('{} exception: {}'.format(clientid, msg))
-    elif isinstance(msg, EvServerTerminated):
+    if isinstance(msg, EvServerTerminated):
       print('server terminated')
       raise Exception('server terminated unexpectedly!')
     elif isinstance(msg, EvTooQuiet):
