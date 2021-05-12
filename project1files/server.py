@@ -62,7 +62,26 @@ def countdown(t):
         t -= 1
     print('New Game Starting')
 
+def clear_buffer(client):
+    global live_idnums
+    global board
+    global buffer
+    
+    try:
+        print("PRINT CHUNK")
+        chunk = client.connection.recv(4096)
 
+    except:
+        return
+        #pass
+    buffer.extend(chunk)
+    msg, consumed = tiles.read_message_from_bytearray(buffer)
+    if not consumed:
+        print("NOT CONSUMED")
+        is_socket_closed(client.connection)
+        return
+    buffer = buffer[consumed:]
+    print('MOTHER FUCKERreceived message {}'.format(msg))
 #intialise the game for all clients and notify all clients of new joining client
 def welcome_all_players():
     global board 
@@ -325,10 +344,10 @@ def play_turn(player):
     # Timeout setting
     connection.settimeout(10)
     try:
-      chunk = connection.recv(4096)
-      if chunk:
-        connection.settimeout(None)
-        print("client responded in time")
+        chunk = connection.recv(4096)
+        if chunk:
+            connection.settimeout(None)
+            print("client responded in time")
     except socket.timeout:
       connection.settimeout(None)
       print("BOT MODE ACTIVATED")
@@ -336,6 +355,7 @@ def play_turn(player):
       return
     buffer.extend(chunk)
     msg, consumed = tiles.read_message_from_bytearray(buffer)
+    
     if not consumed:
         print("NOT CONSUMED")
         is_socket_closed(connection)
@@ -344,27 +364,36 @@ def play_turn(player):
     print('received message {}'.format(msg))
     # sent by the player to put a tile onto the board (in all turns except
     # their second)
+    
     if isinstance(msg, tiles.MessagePlaceTile):
-        if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
-            print("titleId",msg.tileid)
-            print("tilehand",player.tileHand)
-            #update whats in players hand
-            player.tileHand.remove(msg.tileid)
-            #notify clients that placement was successful
-            send_to_all(msg.pack())
-            # check for token movement
-            positionupdates = board.do_player_movement(live_idnums)[0]
-            for msg in positionupdates:
+        if(msg.tileid  in player.tileHand):
+            if board.set_tile(msg.x, msg.y, msg.tileid, msg.rotation, msg.idnum):
+                print("titleId",msg.tileid)
+                print("tilehand",player.tileHand)
+                #update whats in players hand
+                #player.tileHand.remove(msg.tileid)
+                #notify clients that placement was successful
                 send_to_all(msg.pack())
-            # check to see if players token has been eliminated
-            if (check_elimination(idnum, connection)):
-                #player has been eliminated
+                #update whats in players hand
+                player.tileHand.remove(msg.tileid)
+                # check for token movement
+                positionupdates = board.do_player_movement(live_idnums)[0]
+                for msg in positionupdates:
+                    send_to_all(msg.pack())
+                # check to see if players token has been eliminated
+                if (check_elimination(idnum, connection)):
+                    #player has been eliminated
+                    return
+                # pickup a new tile
+                tileid = tiles.get_random_tileid()
+                connection.send(tiles.MessageAddTileToHand(tileid).pack())
+                #update whats in players hand
+                player.tileHand.append(tileid)
+            else:
+                print("NOT VALID TURN GO AGAIN")
+                
                 return
-            # pickup a new tile
-            tileid = tiles.get_random_tileid()
-            connection.send(tiles.MessageAddTileToHand(tileid).pack())
-            #update whats in players hand
-            player.tileHand.append(tileid)
+       
    # sent by the player in the second turn, to choose their token's
     # starting path
     elif isinstance(msg, tiles.MessageMoveToken):
@@ -380,14 +409,19 @@ def play_turn(player):
                 if (check_elimination(idnum, connection)):
                     #player has been eliminated
                     return
-                
+            else:
 
+                print("NOT VALID TURN")
+                return
+                
+   
 def client_handler():
     global gameOver
     global live_idnums
     global board 
     global buffer
     live_idnums = []
+
     #intialise live_idnums with all in_game_clients ids
     for players in in_game_clients:
         live_idnums.append(players.idnum)
@@ -403,7 +437,7 @@ def client_handler():
     board = tiles.Board()
     buffer = bytearray()
     #Start playing loop
-
+    
     gameOver = False
     while (gameOver != True ):
         #sending a MessagePlayerTurn for everyone at the beginning of the game, 
@@ -444,6 +478,8 @@ def client_handler():
     if(len(all_connections)>0):
         # start countdown for new game
         send_to_all_connected(tiles.MessageCountdown().pack())
+        
+        
         countdown(10)
         assign_order()
     else:
