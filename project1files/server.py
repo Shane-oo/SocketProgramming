@@ -479,7 +479,9 @@ def client_handler():
         # start countdown for new game
         send_to_all_connected(tiles.MessageCountdown().pack())
         
-        
+        for clients in all_connections:
+            print("clear buffer")
+            #clear_buffer(clients)
         countdown(10)
         assign_order()
     else:
