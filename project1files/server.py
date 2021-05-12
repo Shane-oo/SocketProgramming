@@ -63,28 +63,24 @@ def countdown(t):
     print('New Game Starting')
 
 def clear_buffer(client):
-    global live_idnums
-    global board
-    global buffer
-    
-    try:
-        print("PRINT CHUNK")
-        chunk = client.connection.recv(4096)
 
-    except:
-        return
-        #pass
-    buffer.extend(chunk)
-    msg, consumed = tiles.read_message_from_bytearray(buffer)
-    if not consumed:
-        print("NOT CONSUMED")
-        is_socket_closed(client.connection)
-        return
-    buffer = buffer[consumed:]
-    print('MOTHER FUCKERreceived message {}'.format(msg))
+    client.connection.settimeout(0.1)
+    try:
+        chunk = client.connection.recv(4096)
+        if chunk:
+            # found messages from previous games
+            client.connection.settimeout(None)
+            chunk = 0
+    except socket.timeout:
+      client.connection.settimeout(None)
+      print("chunk empty")
+      return
+    
+    print("after?",chunk)
 #intialise the game for all clients and notify all clients of new joining client
 def welcome_all_players():
     global board 
+    global buffer
     #intialise the game for all clients
     for players in in_game_clients:
         if(is_socket_closed(players.connection)==True):
@@ -166,7 +162,6 @@ def new_spectator(joinedInGameSpect):
         joinedInGameSpect.connection.send(tiles.MessageMoveToken(idnum, x, y, position).pack())
       if(idnum not in live_idnums and idnum in boardIds):
         # let joinedInGameSpect know or eliminated players
-        
         joinedInGameSpect.connection.send(tiles.MessagePlayerEliminated(idnum).pack())
 
     
@@ -336,6 +331,8 @@ def play_turn(player):
     idnum = player.idnum
     tileHand = player.tileHand
     turns = player.turns
+   
+   
     if(is_socket_closed(connection)==True):
             #do not play turn
             return
@@ -354,12 +351,14 @@ def play_turn(player):
       bot_mode(player)
       return
     buffer.extend(chunk)
+    
     msg, consumed = tiles.read_message_from_bytearray(buffer)
     
     if not consumed:
         print("NOT CONSUMED")
         is_socket_closed(connection)
         return
+    print("DNSMooJNDO",buffer)
     buffer = buffer[consumed:]
     print('received message {}'.format(msg))
     # sent by the player to put a tile onto the board (in all turns except
@@ -421,7 +420,10 @@ def client_handler():
     global board 
     global buffer
     live_idnums = []
-
+    #Clear any previous messages lingering from previous games
+    for clients in all_connections:
+            print("clearing buffer")
+            clear_buffer(clients)
     #intialise live_idnums with all in_game_clients ids
     for players in in_game_clients:
         live_idnums.append(players.idnum)
@@ -479,9 +481,6 @@ def client_handler():
         # start countdown for new game
         send_to_all_connected(tiles.MessageCountdown().pack())
         
-        for clients in all_connections:
-            print("clear buffer")
-            #clear_buffer(clients)
         countdown(10)
         assign_order()
     else:
