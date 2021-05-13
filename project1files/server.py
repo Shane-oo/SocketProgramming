@@ -483,7 +483,7 @@ def client_handler():
     if(len(all_connections)>0):
         # start countdown for new game
         send_to_all_connected(tiles.MessageCountdown().pack())
-        countdown(10)
+        countdown(4)
         assign_order()
     else:
         print("No more connected clients")
@@ -655,11 +655,11 @@ def work():
             # if no players have joined countdown will start again until there is connected clients
             queue.put(2)
         if x ==3 :
-            joinedInGameSpect = all_connections[-1]
-            spectator_clients.append(joinedInGameSpect )
-            new_spectator(joinedInGameSpect)
-            #spectator_clients.append(joinedInGameSpect )
-           
+            for clients in all_connections: 
+                if clients not in spectator_clients and clients not in in_game_clients:
+                    joinedInGameSpect = clients
+                    spectator_clients.append(joinedInGameSpect)
+                    new_spectator(joinedInGameSpect)
         queue.task_done()
 
 
