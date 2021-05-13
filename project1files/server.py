@@ -475,8 +475,9 @@ def complete_disconnection(badConnection):
     #remove them from spectator_clients if they are a spectator 
     spectator_clients = [connectedSpectators for connectedSpectators in spectator_clients if connectedSpectators.connection != badConnection]
 
-# this function was partly from:
+# this function was made with help from Michael Petrov on:
 # https://stackoverflow.com/questions/48024720/python-how-to-check-if-socket-is-still-connected
+# if running on windows remove commented out line under win32 and comment out first data = line
 #if return false client is still connected
 #if return ture client is disconnected and should be removed from all variables and close its connection from server
 def is_socket_closed(connection):
