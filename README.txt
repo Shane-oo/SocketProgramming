@@ -14,3 +14,14 @@ Note: The server.py does not pass the tester.py tests all the time, sometimes it
 different tasks we had to do.
 
 Lastly thank you to Jin Hong and the lab demonstrators, and a special thanks to Matt Egan for all his help on this project.
+
+///-----------------HOW TO RUN PROGRAM----------------///
+Open as many terminal programs as you wish, 1 to be the server and the rest to be the players/spectators
+
+On server terminal:
+$ python3 server.py
+
+On client terminals:
+$ python3 client_v2.py
+
+Play the game!
