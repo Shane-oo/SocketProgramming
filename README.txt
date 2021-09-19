@@ -24,4 +24,8 @@ $ python3 server.py
 On client terminals:
 $ python3 client_v2.py
 
+see example.png if unsure
+
+...
+
 Play the game!
