@@ -64,7 +64,7 @@ def countdown(t):
         t -= 1
     print('New Game Starting')
 # Remove any messages lingering from a previous game
-# Will clear any messages sent from elimated players so that it doesnt not carry over to the next game
+# Will clear any messages sent from elimated players so that it does not carry over to the next game
 def clear_buffer(client):
     client.connection.settimeout(0.1)
     try:
